@@ -315,7 +315,7 @@ function restoreBackupSnapshot(snapshot) {
 // SETUP: change API_KEY here to match the one set in server/api.php, and
 // change API_URL if the app isn't hosted at school.theflairhub.com.
 
-const API_URL = "https://school.theflairhub.com/server/api.php";
+const API_KEY = import.meta.env.VITE_API_KEY;
 const API_KEY = "xLyCJQWLs3d1mO1nO-Trsl9N5cypncdw4gQaRWI_81Q";
 const SERVER_POLL_MS = 25000; // how often devices check for changes made elsewhere
 const SERVER_PUSH_DEBOUNCE_MS = 1200;
