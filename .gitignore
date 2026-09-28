@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .env
 .env.*
+
+deploy_key
+deploy_key.pub
