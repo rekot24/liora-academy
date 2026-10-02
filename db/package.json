@@ -6,9 +6,9 @@
   "description": "Postgres schema, migrations and migration/parity tooling for Liora's Academy. Isolated from the Vite app so the web build is unaffected.",
   "scripts": {
     "test": "node --test",
-    "migrate": "node bin/migrate.mjs",
-    "import:legacy": "node bin/import-legacy.mjs",
-    "export:legacy": "node bin/export-legacy.mjs"
+    "migrate": "node cli/migrate.mjs",
+    "import:legacy": "node cli/import-legacy.mjs",
+    "export:legacy": "node cli/export-legacy.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0"

@@ -11,9 +11,9 @@ Vite web build (`npm ci && npm run build` in the repo root) is not affected by a
 | `seed/defaults.json` | Defaults for a NEW household: starter life-skills catalog and default weekly pattern. **No lessons are seeded.** |
 | `lib/migrate.mjs` | Applies unapplied migrations in order, each in a transaction, recorded in `schema_migrations`. |
 | `lib/connect.mjs` | Connects with `pg` using `DATABASE_URL` (env var or `db/.env`, which is gitignored). |
-| `bin/migrate.mjs` | `npm run migrate`: applies pending migrations to your real database. Safe to re-run. |
-| `bin/import-legacy.mjs` | `npm run import:legacy -- backup.json ...`: one-time import of an exported backup. Has `--dry-run`. |
-| `bin/export-legacy.mjs` | `npm run export:legacy -- --student Liora`: writes the old backup-JSON shape from the tables (rollback copy). |
+| `cli/migrate.mjs` | `npm run migrate`: applies pending migrations to your real database. Safe to re-run. |
+| `cli/import-legacy.mjs` | `npm run import:legacy -- backup.json ...`: one-time import of an exported backup. Has `--dry-run`. |
+| `cli/export-legacy.mjs` | `npm run export:legacy -- --student Liora`: writes the old backup-JSON shape from the tables (rollback copy). |
 | `lib/households.mjs` | Create households, students, subjects, enrollments. |
 | `lib/legacy.mjs` | `importLegacySnapshot` (old backup JSON → tables) and `exportLegacySnapshot` (tables → old JSON shape). |
 | `test/parity.test.mjs` | Tests, run against real Postgres semantics (PGlite, in-process). |
@@ -66,17 +66,18 @@ email to a household and role, so per-person logins (or other families) need no 
 ## Putting it on your server's Postgres
 
 PostgreSQL 13 or newer (`gen_random_uuid()` is built in). Use a separate database so nothing else on
-the server is affected.
+the server is affected. Use `127.0.0.1`, not `localhost`, in the connection line.
+If Postgres runs in Docker, open psql with `docker exec -it <container> psql -U <superuser> -d postgres`.
 
 1. **Create the database and an app login, once.** As the postgres superuser (however you reach psql):
    ```sql
-   CREATE ROLE liora_app LOGIN PASSWORD 'a-long-random-password';
-   CREATE DATABASE liora_academy OWNER liora_app;
+   CREATE ROLE homeschool_app LOGIN PASSWORD 'a-long-random-password';
+   CREATE DATABASE homeschool OWNER homeschool_app;
    ```
 2. **Tell the tools where it is.** On the machine that will run the commands, create `db/.env`
    (gitignored, never committed):
    ```
-   DATABASE_URL=postgres://liora_app:a-long-random-password@localhost:5432/liora_academy
+   DATABASE_URL=postgres://homeschool_app:a-long-random-password@127.0.0.1:5432/homeschool
    ```
 3. **Create the tables.**
    ```bash
