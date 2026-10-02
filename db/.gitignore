@@ -1,0 +1,4 @@
+node_modules
+private/
+*.backup.json
+liora-academy-backup*.json

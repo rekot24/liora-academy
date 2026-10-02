@@ -1,0 +1,13 @@
+{
+  "name": "liora-academy-db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Postgres schema, migrations and migration/parity tooling for Liora's Academy. Isolated from the Vite app so the web build is unaffected.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  }
+}
