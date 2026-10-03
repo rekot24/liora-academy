@@ -21,3 +21,13 @@
 **Order of work.** (1) Schema + migration + parity test (this branch, `db/`). (2) Read-only API + front-end data layer swapped in behind the same state shapes, old sync code retired. (3) Student selector in the admin panel and Amari's profile (January 2027). (4) Grade tags and sorting in the Curriculum tab. Later: per-person logins, portfolio uploads, push alerts, splitting `App.jsx`.
 
 **Known data facts at migration time.** Math and Speaking have no lessons yet (expected). Grades, field trips, extracurriculars, alerts and overrides have never been used. 140 lessons, 134 scheduled items, 17 completions for Liora.
+
+## API (October 2026)
+
+A small Node/Fastify service in `api/` (own Docker container, host networking, listening on
+`127.0.0.1:3100`, reached through Nginx at `/api/`). Granular, transactional writes (merge-patch bodies; lists such as field trips, activities, life skills and semesters are upsert/remove by id, never whole-list replace, so a stale device cannot erase other devices' entries);
+the front end keeps its existing state shapes and sends only the differences between the old and new
+value of each key. Writes about deleted lessons are skipped and reported, never resurrected.
+`GET /students/:id/snapshot` returns one student's data in the old app's shape. Identity is decided in
+one function (`api/src/auth.mjs`). Migrations apply automatically at container start (`AUTO_MIGRATE`).
+Migration 002 makes lesson archive-vs-delete work on PostgreSQL 17 and 18, which raise different error codes.

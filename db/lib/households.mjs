@@ -47,22 +47,16 @@ export async function createStudent(db, { householdId, name, gradeLabel = null, 
   return rows[0].id;
 }
 
-// Finds or creates a subject by name inside a household.
+// Finds or creates a subject by name inside a household. One atomic statement, so two requests
+// creating the same subject at the same moment cannot collide.
 export async function ensureSubject(db, householdId, name, sortOrder = null) {
-  const found = await db.query("SELECT id FROM subjects WHERE household_id = $1 AND name = $2", [householdId, name]);
-  if (found.rows[0]) return found.rows[0].id;
-  let order = sortOrder;
-  if (order === null) {
-    const max = await db.query("SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM subjects WHERE household_id = $1", [
-      householdId,
-    ]);
-    order = max.rows[0].n;
-  }
-  const { rows } = await db.query("INSERT INTO subjects (household_id, name, sort_order) VALUES ($1, $2, $3) RETURNING id", [
-    householdId,
-    name,
-    order,
-  ]);
+  const { rows } = await db.query(
+    `INSERT INTO subjects (household_id, name, sort_order)
+     VALUES ($1, $2, COALESCE($3::integer, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM subjects WHERE household_id = $1)))
+     ON CONFLICT (household_id, name) DO UPDATE SET name = subjects.name
+     RETURNING id`,
+    [householdId, name, sortOrder]
+  );
   return rows[0].id;
 }
 

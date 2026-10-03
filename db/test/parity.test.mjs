@@ -95,7 +95,7 @@ function expectedAfterImport(snap) {
 test("migrations apply once and are idempotent", async () => {
   const db = new PGlite();
   const first = await migrate(db);
-  assert.deepEqual(first, ["001_init.sql"]);
+  assert.deepEqual(first, ["001_init.sql", "002_remove_or_archive_pg18.sql"]);
   assert.deepEqual(await migrate(db), []);
 });
 
