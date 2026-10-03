@@ -266,21 +266,30 @@ export async function putPattern(tx, { householdId, studentId }, body) {
   return { applied: body.length };
 }
 
-// body: { semesters: { "<slug>": { id, name, mode, startDate, endDate, subjects:[...], targetDays } }, activeSemester: "<slug>" | null }
-// Semester definitions are shared by the household; this student's enrollment in each carries
-// their own subject list and target days. A semester missing from the body is un-enrolled for
-// THIS student only, and removed entirely only if nobody else is enrolled in it.
-export async function putSemesters(tx, { householdId, studentId }, body) {
+// body: {
+//   semesters: { "<slug>": { id, name, mode, startDate, endDate, subjects:[...], targetDays } },   optional: add or edit these
+//   remove: ["<slug>", ...],                                                                      optional: un-enroll this student
+//   activeSemester: "<slug>" | null                                                               optional: omit to leave unchanged
+// }
+// Semester definitions are shared by the household; this student's enrollment carries their own
+// subject list and target days. NOTHING is removed unless it is named in `remove`, so a device with
+// an old copy cannot delete a semester someone else just added. A removed semester is deleted
+// outright only if nobody else is enrolled in it.
+export async function patchSemesters(tx, { householdId, studentId }, body) {
   reqObject(body, "body");
   const semesters = reqObject(body.semesters ?? {}, "semesters");
-  const activeSlug = body.activeSemester ?? null;
-  const slugs = new Set(Object.entries(semesters).map(([key, s]) => (isObj(s) && s.id) || key));
-  if (activeSlug !== null && !slugs.has(activeSlug)) throw bad(`activeSemester "${activeSlug}" is not one of the semesters`);
+  const remove = reqArray(body.remove ?? [], "remove");
+  const setsActive = Object.prototype.hasOwnProperty.call(body, "activeSemester");
 
+  // remember the current weekly pattern before anything changes (it follows the active semester)
   const previousActive = await activeEnrollment(tx, studentId);
-  await tx.query("UPDATE enrollments SET is_active = false WHERE student_id = $1", [studentId]);
+  const previousPattern = previousActive
+    ? (await tx.query(
+        "SELECT sub.name AS subject, p.days FROM enrollment_pattern p JOIN subjects sub ON sub.id = p.subject_id WHERE p.enrollment_id = $1 ORDER BY p.position",
+        [previousActive]
+      )).rows
+    : [];
 
-  let newActive = null;
   for (const [key, sem] of Object.entries(semesters)) {
     reqObject(sem, `semester ${key}`);
     const slug = sem.id || key;
@@ -294,48 +303,50 @@ export async function putSemesters(tx, { householdId, studentId }, body) {
        RETURNING id`,
       [householdId, slug, name, optString(sem.mode, "mode"), startDate, endDate]
     );
-    const isActive = slug === activeSlug;
     const { rows: e } = await tx.query(
-      `INSERT INTO enrollments (student_id, semester_id, target_days, is_active) VALUES ($1,$2,$3,$4)
-       ON CONFLICT (student_id, semester_id) DO UPDATE SET target_days = EXCLUDED.target_days, is_active = EXCLUDED.is_active
+      `INSERT INTO enrollments (student_id, semester_id, target_days) VALUES ($1,$2,$3)
+       ON CONFLICT (student_id, semester_id) DO UPDATE SET target_days = EXCLUDED.target_days
        RETURNING id`,
-      [studentId, s[0].id, optInt(sem.targetDays, "targetDays"), isActive]
+      [studentId, s[0].id, optInt(sem.targetDays, "targetDays")]
     );
-    if (isActive) newActive = e[0].id;
     await tx.query("DELETE FROM enrollment_subjects WHERE enrollment_id = $1", [e[0].id]);
     let position = 0;
-    for (const name2 of subjects) {
-      const subjectId = await ensureSubject(tx, householdId, reqString(name2, "subject name"));
+    for (const subjectName of subjects) {
+      const subjectId = await ensureSubject(tx, householdId, reqString(subjectName, "subject name"));
       await tx.query("INSERT INTO enrollment_subjects (enrollment_id, subject_id, position) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING", [e[0].id, subjectId, position++]);
     }
   }
 
-  // un-enroll from semesters that are no longer listed; drop a semester nobody is in any more
-  const { rows: gone } = await tx.query(
-    `SELECT e.id AS enrollment_id, s.id AS semester_id FROM enrollments e JOIN semesters s ON s.id = e.semester_id
-      WHERE e.student_id = $1 AND NOT (s.slug = ANY($2::text[]))`,
-    [studentId, `{${[...slugs].map((x) => `"${x.replace(/(["\\])/g, "\\$1")}"`).join(",")}}`]
-  );
-  for (const g of gone) {
-    await tx.query("DELETE FROM enrollments WHERE id = $1", [g.enrollment_id]);
-    await tx.query("DELETE FROM semesters WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM enrollments WHERE semester_id = $1)", [g.semester_id]);
+  for (const slug of remove) {
+    const { rows } = await tx.query(
+      "SELECT e.id AS enrollment_id, s.id AS semester_id FROM enrollments e JOIN semesters s ON s.id = e.semester_id WHERE e.student_id = $1 AND s.household_id = $2 AND s.slug = $3",
+      [studentId, householdId, reqString(slug, "semester to remove")]
+    );
+    if (!rows[0]) continue;
+    await tx.query("DELETE FROM enrollments WHERE id = $1", [rows[0].enrollment_id]);
+    await tx.query("DELETE FROM semesters WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM enrollments WHERE semester_id = $1)", [rows[0].semester_id]);
   }
 
-  // The weekly pattern follows the active semester: if the newly active enrollment has none,
-  // inherit the previous active one's, or the starter pattern for a student's first semester.
-  if (newActive && newActive !== previousActive) {
-    const { rows } = await tx.query("SELECT 1 FROM enrollment_pattern WHERE enrollment_id = $1 LIMIT 1", [newActive]);
-    if (!rows.length) {
-      const copied = previousActive
-        ? await tx.query(
-            "INSERT INTO enrollment_pattern (enrollment_id, subject_id, days, position) SELECT $1, subject_id, days, position FROM enrollment_pattern WHERE enrollment_id = $2",
-            [newActive, previousActive]
-          )
-        : { rowCount: 0 };
-      if (!copied.rowCount) await writePattern(tx, householdId, newActive, DEFAULTS.weeklyPattern, { onlyExistingSubjects: true });
+  if (setsActive) {
+    await tx.query("UPDATE enrollments SET is_active = false WHERE student_id = $1", [studentId]);
+    if (body.activeSemester !== null) {
+      const { rows } = await tx.query(
+        "SELECT e.id FROM enrollments e JOIN semesters s ON s.id = e.semester_id WHERE e.student_id = $1 AND s.household_id = $2 AND s.slug = $3",
+        [studentId, householdId, reqString(body.activeSemester, "activeSemester")]
+      );
+      if (!rows[0]) throw bad(`activeSemester "${body.activeSemester}" is not one of this student's semesters`);
+      await tx.query("UPDATE enrollments SET is_active = true WHERE id = $1", [rows[0].id]);
+      // the weekly pattern follows the active semester: inherit the previous one's, or the starter pattern
+      if (rows[0].id !== previousActive) {
+        const { rows: has } = await tx.query("SELECT 1 FROM enrollment_pattern WHERE enrollment_id = $1 LIMIT 1", [rows[0].id]);
+        if (!has.length) {
+          if (previousPattern.length) await writePattern(tx, householdId, rows[0].id, previousPattern);
+          else await writePattern(tx, householdId, rows[0].id, DEFAULTS.weeklyPattern, { onlyExistingSubjects: true });
+        }
+      }
     }
   }
-  return { applied: slugs.size };
+  return { applied: Object.keys(semesters).length + remove.length };
 }
 
 // ───────────────────────── lists and settings ─────────────────────────
@@ -344,34 +355,60 @@ const TRIP_KNOWN = new Set(["date", "place", "subjects", "notes", "countsAttenda
 const ACTIVITY_KNOWN = new Set(["name", "type", "days", "time", "location", "notes"]);
 const extras = (obj, known) => Object.fromEntries(Object.entries(obj).filter(([k]) => !known.has(k)));
 
-// body: [ { date, place, subjects, notes, countsAttendance, ...anything else is kept } ]
-export async function putFieldTrips(tx, { studentId }, body) {
-  reqArray(body, "body");
-  await tx.query("DELETE FROM field_trips WHERE student_id = $1", [studentId]);
-  let position = 0;
-  for (const t of body) {
+// body: { upsert: [ { id, date, place, subjects, notes, countsAttendance } ], remove: ["<id>", ...] }
+// Each trip is identified by the id the app gave it. Only the trips named are touched, so a device
+// with an old list cannot delete trips added elsewhere.
+export async function patchFieldTrips(tx, { studentId }, body) {
+  reqObject(body, "body");
+  let applied = 0;
+  for (const t of reqArray(body.upsert ?? [], "upsert")) {
     reqObject(t, "field trip");
-    await tx.query(
-      `INSERT INTO field_trips (student_id, trip_date, place, subjects, notes, counts_attendance, position, meta) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
-      [studentId, reqDate(t.date, "trip date"), reqString(t.place, "trip place"), optString(t.subjects, "subjects"), optString(t.notes, "notes"), t.countsAttendance !== false, position++, JSON.stringify(extras(t, TRIP_KNOWN))]
-    );
+    const id = reqString(t.id, "field trip id");
+    const values = [reqDate(t.date, "trip date"), reqString(t.place, "trip place"), optString(t.subjects, "subjects"), optString(t.notes, "notes"), t.countsAttendance !== false, JSON.stringify(extras(t, TRIP_KNOWN))];
+    const found = await tx.query("SELECT id FROM field_trips WHERE student_id = $1 AND meta->>'id' = $2", [studentId, id]);
+    if (found.rows[0]) {
+      await tx.query("UPDATE field_trips SET trip_date = $2, place = $3, subjects = $4, notes = $5, counts_attendance = $6, meta = $7::jsonb WHERE id = $1", [found.rows[0].id, ...values]);
+    } else {
+      await tx.query(
+        `INSERT INTO field_trips (student_id, trip_date, place, subjects, notes, counts_attendance, meta, position)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,(SELECT COALESCE(MAX(position), -1) + 1 FROM field_trips WHERE student_id = $1))`,
+        [studentId, ...values]
+      );
+    }
+    applied++;
   }
-  return { applied: body.length };
+  for (const id of reqArray(body.remove ?? [], "remove")) {
+    await tx.query("DELETE FROM field_trips WHERE student_id = $1 AND meta->>'id' = $2", [studentId, reqString(id, "field trip id")]);
+    applied++;
+  }
+  return { applied };
 }
 
-// body: [ { name, type, days:[0-6], time, location, notes, ...anything else is kept } ]
-export async function putExtracurriculars(tx, { studentId }, body) {
-  reqArray(body, "body");
-  await tx.query("DELETE FROM extracurriculars WHERE student_id = $1", [studentId]);
-  let position = 0;
-  for (const a of body) {
+// body: { upsert: [ { id, name, type, days:[0-6], time, location, notes } ], remove: ["<id>", ...] }
+export async function patchExtracurriculars(tx, { studentId }, body) {
+  reqObject(body, "body");
+  let applied = 0;
+  for (const a of reqArray(body.upsert ?? [], "upsert")) {
     reqObject(a, "activity");
-    await tx.query(
-      `INSERT INTO extracurriculars (student_id, name, type, days, time, location, notes, position, meta) VALUES ($1,$2,$3,$4::smallint[],$5,$6,$7,$8,$9::jsonb)`,
-      [studentId, reqString(a.name, "activity name"), optString(a.type, "type"), pgArray(dayList(a.days, "days")), optString(a.time, "time"), optString(a.location, "location"), optString(a.notes, "notes"), position++, JSON.stringify(extras(a, ACTIVITY_KNOWN))]
-    );
+    const id = reqString(a.id, "activity id");
+    const values = [reqString(a.name, "activity name"), optString(a.type, "type"), pgArray(dayList(a.days, "days")), optString(a.time, "time"), optString(a.location, "location"), optString(a.notes, "notes"), JSON.stringify(extras(a, ACTIVITY_KNOWN))];
+    const found = await tx.query("SELECT id FROM extracurriculars WHERE student_id = $1 AND meta->>'id' = $2", [studentId, id]);
+    if (found.rows[0]) {
+      await tx.query("UPDATE extracurriculars SET name = $2, type = $3, days = $4::smallint[], time = $5, location = $6, notes = $7, meta = $8::jsonb WHERE id = $1", [found.rows[0].id, ...values]);
+    } else {
+      await tx.query(
+        `INSERT INTO extracurriculars (student_id, name, type, days, time, location, notes, meta, position)
+         VALUES ($1,$2,$3,$4::smallint[],$5,$6,$7,$8::jsonb,(SELECT COALESCE(MAX(position), -1) + 1 FROM extracurriculars WHERE student_id = $1))`,
+        [studentId, ...values]
+      );
+    }
+    applied++;
   }
-  return { applied: body.length };
+  for (const id of reqArray(body.remove ?? [], "remove")) {
+    await tx.query("DELETE FROM extracurriculars WHERE student_id = $1 AND meta->>'id' = $2", [studentId, reqString(id, "activity id")]);
+    applied++;
+  }
+  return { applied };
 }
 
 // body: { label, status: "pending"|"scheduled"|"completed", dueDate, showFrom }
@@ -402,30 +439,34 @@ export async function putAlertSettings(tx, { studentId }, body) {
 
 // ───────────────────────── household catalogs ─────────────────────────
 
-// body: { "Category": [ { id, title }, ... ], ... }  — the whole life-skills catalog.
-// Skills that disappear from it are deleted if nobody has progress on them, archived otherwise.
-export async function putLifeSkills(tx, { householdId }, body) {
+// body: { upsert: [ { id, category, title } ], remove: ["<id>", ...], order: ["<id>", ...] }
+// Only the skills named are touched. A removed skill is deleted if nobody has progress on it,
+// archived otherwise (so a student's record of having learned it is never lost).
+export async function patchLifeSkills(tx, { householdId }, body) {
   reqObject(body, "body");
-  const { rows: existing } = await tx.query("SELECT id, legacy_id FROM life_skills WHERE household_id = $1", [householdId]);
-  const byKey = new Map(existing.map((r) => [r.legacy_id ?? r.id, r.id]));
-  const seen = new Set();
-  let sortOrder = 0;
-  for (const [category, items] of Object.entries(body)) {
-    for (const item of reqArray(items, `skills in ${category}`)) {
-      const key = reqString(item?.id, "skill id");
-      const title = reqString(item.title, `title of ${key}`);
-      seen.add(key);
-      if (byKey.has(key)) {
-        await tx.query("UPDATE life_skills SET category = $2, title = $3, sort_order = $4, archived_at = NULL WHERE id = $1", [byKey.get(key), category, title, sortOrder++]);
-      } else {
-        await tx.query("INSERT INTO life_skills (household_id, legacy_id, category, title, sort_order) VALUES ($1,$2,$3,$4,$5)", [householdId, key, category, title, sortOrder++]);
-      }
-    }
-  }
+  const keys = await skillKeys(tx, householdId);
   let removed = 0;
   let archived = 0;
-  for (const [key, id] of byKey) {
-    if (seen.has(key)) continue;
+  let applied = 0;
+  for (const item of reqArray(body.upsert ?? [], "upsert")) {
+    reqObject(item, "skill");
+    const key = reqString(item.id, "skill id");
+    const category = reqString(item.category, `category of ${key}`);
+    const title = reqString(item.title, `title of ${key}`);
+    if (keys.has(key)) {
+      await tx.query("UPDATE life_skills SET category = $2, title = $3, archived_at = NULL WHERE id = $1", [keys.get(key), category, title]);
+    } else {
+      const { rows } = await tx.query(
+        "INSERT INTO life_skills (household_id, legacy_id, category, title, sort_order) VALUES ($1,$2,$3,$4,(SELECT COALESCE(MAX(sort_order), -1) + 1 FROM life_skills WHERE household_id = $1)) RETURNING id",
+        [householdId, key, category, title]
+      );
+      keys.set(key, rows[0].id);
+    }
+    applied++;
+  }
+  for (const key of reqArray(body.remove ?? [], "remove")) {
+    const id = keys.get(key);
+    if (!id) continue;
     const { rows } = await tx.query("SELECT 1 FROM life_skill_progress WHERE life_skill_id = $1 LIMIT 1", [id]);
     if (rows.length) {
       await tx.query("UPDATE life_skills SET archived_at = COALESCE(archived_at, now()) WHERE id = $1", [id]);
@@ -435,7 +476,14 @@ export async function putLifeSkills(tx, { householdId }, body) {
       removed++;
     }
   }
-  return { applied: seen.size, removed, archived };
+  if (body.order !== undefined) {
+    let position = 0;
+    for (const key of reqArray(body.order, "order")) {
+      const id = keys.get(key);
+      if (id) await tx.query("UPDATE life_skills SET sort_order = $2 WHERE id = $1", [id, position++]);
+    }
+  }
+  return { applied, removed, archived };
 }
 
 const LESSON_COLUMNS = {

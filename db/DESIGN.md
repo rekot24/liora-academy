@@ -25,7 +25,7 @@
 ## API (October 2026)
 
 A small Node/Fastify service in `api/` (own Docker container, host networking, listening on
-`127.0.0.1:3100`, reached through Nginx at `/api/`). Granular, transactional writes (merge-patch bodies);
+`127.0.0.1:3100`, reached through Nginx at `/api/`). Granular, transactional writes (merge-patch bodies; lists such as field trips, activities, life skills and semesters are upsert/remove by id, never whole-list replace, so a stale device cannot erase other devices' entries);
 the front end keeps its existing state shapes and sends only the differences between the old and new
 value of each key. Writes about deleted lessons are skipped and reported, never resurrected.
 `GET /students/:id/snapshot` returns one student's data in the old app's shape. Identity is decided in

@@ -28,6 +28,7 @@ function client(app) {
     return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
   };
   return {
+    raw: (method, url, headers = {}) => app.inject({ method, url, headers }),
     get: (url) => call("GET", url),
     patch: (url, body) => call("PATCH", url, body),
     put: (url, body) => call("PUT", url, body),
@@ -60,7 +61,7 @@ function fixture() {
     grades: { "2026-08-11": { m2: { type: "score", value: 42, max: 50 } }, "2026-08-12": { m3: { type: "pass_fail", value: "fail" }, ghost: { type: "pass_fail", value: "pass" } } },
     skills: { ls001: true, ls001_date: "2026-08-12", ls002: false, ls002_date: "2026-08-12" },
     skillsCatalog: { Kitchen: [{ id: "ls001", title: "Knife skills" }, { id: "ls002", title: "Cook a meal" }], Auto: [{ id: "ls003", title: "Check oil" }] },
-    fieldTrips: [{ id: "ft1", date: "2026-09-01", place: "Museum", subjects: "History", notes: "fun", countsAttendance: true }, { date: "2026-09-15", place: "Park", countsAttendance: false }],
+    fieldTrips: [{ id: "ft1", date: "2026-09-01", place: "Museum", subjects: "History", notes: "fun", countsAttendance: true }, { id: "ft2", date: "2026-09-15", place: "Park", countsAttendance: false }],
     extracurriculars: [{ id: "ex1", name: "Swim", type: "Sport", days: [2, 4], time: "16:00", location: "Rec center", notes: "" }],
     evaluation: { label: "Annual evaluation", status: "scheduled", dueDate: "2027-04-30", showFrom: "2027-03-01" },
     alerts: { "2026-08-10:m1": "09:30", "2026-08-10:ghost": "10:00" },
@@ -107,8 +108,9 @@ async function replay(api, studentId, snap) {
     lessons: { upsert: lessons },
     order: Object.fromEntries(Object.entries(snap.assignments).map(([s, items]) => [s, items.map((l) => l.id)])),
   }), "catalog");
-  ok(await api.put("/api/v1/life-skills", snap.skillsCatalog ?? DEFAULTS.lifeSkills), "life skills");
-  ok(await api.put(`${base}/semesters`, { semesters: snap.semesters, activeSemester: snap.activeSemester }), "semesters");
+  const skillList = Object.entries(snap.skillsCatalog ?? DEFAULTS.lifeSkills).flatMap(([category, items]) => items.map((i) => ({ id: i.id, category, title: i.title })));
+  ok(await api.patch("/api/v1/life-skills", { upsert: skillList, order: skillList.map((x) => x.id) }), "life skills");
+  ok(await api.patch(`${base}/semesters`, { semesters: snap.semesters, activeSemester: snap.activeSemester }), "semesters");
   ok(await api.put(`${base}/pattern`, snap.pattern), "pattern");
   ok(await api.patch(`${base}/schedule`, snap.schedule), "schedule");
   ok(await api.patch(`${base}/overrides`, Array.isArray(snap.overrides) ? {} : snap.overrides ?? {}), "overrides");
@@ -116,8 +118,8 @@ async function replay(api, studentId, snap) {
   ok(await api.patch(`${base}/grades`, snap.grades ?? {}), "grades");
   ok(await api.patch(`${base}/skills`, snap.skills ?? {}), "skills");
   ok(await api.patch(`${base}/alerts`, snap.alerts ?? {}), "alerts");
-  ok(await api.put(`${base}/field-trips`, snap.fieldTrips ?? []), "field trips");
-  ok(await api.put(`${base}/extracurriculars`, snap.extracurriculars ?? []), "extracurriculars");
+  ok(await api.patch(`${base}/field-trips`, { upsert: snap.fieldTrips ?? [] }), "field trips");
+  ok(await api.patch(`${base}/extracurriculars`, { upsert: snap.extracurriculars ?? [] }), "extracurriculars");
   ok(await api.put(`${base}/evaluation`, snap.evaluation ?? LEGACY_FALLBACKS.evaluation), "evaluation");
   ok(await api.put(`${base}/alert-settings`, snap.alertSettings ?? LEGACY_FALLBACKS.alertSettings), "alert settings");
 }
@@ -262,62 +264,111 @@ test("catalog: add, edit one field, order, delete unused, archive used, restore"
   assert.ok(snap.assignments.Math.some((l) => l.id === "m1"));
 });
 
-test("semesters and pattern: switching semester carries the pattern; un-enrolling is per student", async () => {
+test("semesters and pattern: switching semester carries the pattern; removal is explicit and per student", async () => {
   const { api, base, db, householdId } = await seeded();
   const current = (await api.get(`${base}/snapshot`)).body;
   // add a spring semester and make it active: the weekly pattern follows
-  const semesters = { ...current.semesters, "2027-spring": { id: "2027-spring", name: "Spring 2027", mode: "full", startDate: "2027-01-11", endDate: "2027-05-28", subjects: ["Math", "Reading"], targetDays: 80 } };
-  assert.equal((await api.put(`${base}/semesters`, { semesters, activeSemester: "2027-spring" })).status, 200);
+  const spring = { id: "2027-spring", name: "Spring 2027", mode: "full", startDate: "2027-01-11", endDate: "2027-05-28", subjects: ["Math", "Reading"], targetDays: 80 };
+  assert.equal((await api.patch(`${base}/semesters`, { semesters: { "2027-spring": spring }, activeSemester: "2027-spring" })).status, 200);
   let snap = (await api.get(`${base}/snapshot`)).body;
   assert.equal(snap.activeSemester, "2027-spring");
+  assert.ok(snap.semesters["2026-fall"], "sending one semester did not delete the others");
   assert.deepEqual(snap.pattern, current.pattern, "pattern carried over");
   assert.deepEqual(snap.semesters["2027-spring"].subjects, ["Math", "Reading"]);
+  // omitting activeSemester leaves the active one alone
+  await api.patch(`${base}/semesters`, { semesters: { "2027-spring": { ...spring, targetDays: 81 } } });
+  snap = (await api.get(`${base}/snapshot`)).body;
+  assert.equal(snap.activeSemester, "2027-spring");
+  assert.equal(snap.semesters["2027-spring"].targetDays, 81);
   // change the pattern of the active semester only
   await api.put(`${base}/pattern`, [{ subject: "Math", days: [2, 4] }]);
   snap = (await api.get(`${base}/snapshot`)).body;
   assert.deepEqual(snap.pattern, [{ subject: "Math", days: [2, 4] }]);
   // a second student enrolls in the shared spring semester
   const amari = (await api.post("/api/v1/students", { name: "Amari", gradeLabel: "8th" })).body.id;
-  await api.put(`/api/v1/students/${amari}/semesters`, { semesters: { "2027-spring": { id: "2027-spring", name: "Spring 2027", mode: "full", startDate: "2027-01-11", endDate: "2027-05-28", subjects: ["Math"], targetDays: 70 } }, activeSemester: "2027-spring" });
+  await api.patch(`/api/v1/students/${amari}/semesters`, { semesters: { "2027-spring": { ...spring, subjects: ["Math"], targetDays: 70 } }, activeSemester: "2027-spring" });
   const a = (await api.get(`/api/v1/students/${amari}/snapshot`)).body;
   const existing = new Set(["Math", "Reading", "Science"]); // the subjects this household has
   assert.deepEqual(a.pattern, DEFAULTS.weeklyPattern.filter((r) => existing.has(r.subject)), "a new student's first semester starts with the starter pattern, for subjects that exist");
   assert.deepEqual(Object.keys(a.assignments), ["Math", "Reading", "Science"], "the starter pattern did not invent subjects");
   assert.equal(a.semesters["2027-spring"].targetDays, 70, "Amari's own target days");
-  assert.equal(snap.semesters["2027-spring"].targetDays, 80, "Liora's unchanged");
-  // Liora drops spring: it must survive, because Amari is still enrolled
-  const without = Object.fromEntries(Object.entries(snap.semesters).filter(([k]) => k !== "2027-spring"));
-  await api.put(`${base}/semesters`, { semesters: without, activeSemester: "2026-fall" });
+  assert.equal(snap.semesters["2027-spring"].targetDays, 81, "Liora's unchanged");
+  // Liora drops spring: it survives, because Amari is still enrolled; Liora's other semesters are untouched
+  await api.patch(`${base}/semesters`, { remove: ["2027-spring"], activeSemester: "2026-fall" });
+  snap = (await api.get(`${base}/snapshot`)).body;
+  assert.deepEqual(Object.keys(snap.semesters), ["2026-summer", "2026-fall"]);
+  assert.equal(snap.activeSemester, "2026-fall");
   assert.equal((await db.query("SELECT count(*)::int AS n FROM semesters WHERE household_id = $1 AND slug = '2027-spring'", [householdId])).rows[0].n, 1);
+  // once nobody is enrolled, the semester itself goes
+  await api.patch(`/api/v1/students/${amari}/semesters`, { remove: ["2027-spring"] });
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM semesters WHERE household_id = $1 AND slug = '2027-spring'", [householdId])).rows[0].n, 0);
   // bad requests
-  assert.equal((await api.put(`${base}/semesters`, { semesters: without, activeSemester: "nope" })).status, 400);
+  assert.equal((await api.patch(`${base}/semesters`, { activeSemester: "nope" })).status, 400);
+  assert.equal((await api.patch(`${base}/semesters`, { semesters: { x: { name: "No dates" } } })).status, 400);
 });
 
-test("field trips, activities, evaluation and alert settings", async () => {
+test("field trips and activities: granular, so a stale device cannot erase other devices' entries", async () => {
   const { api, base } = await seeded();
-  await api.put(`${base}/field-trips`, [{ date: "2026-11-01", place: "Zoo", countsAttendance: true, id: "x1" }]);
-  await api.put(`${base}/extracurriculars`, [{ name: "Piano", days: [3], time: "17:00" }]);
+  // device A adds a trip and an activity
+  await api.patch(`${base}/field-trips`, { upsert: [{ id: "ftA", date: "2026-11-01", place: "Zoo", subjects: "Science", countsAttendance: true }] });
+  await api.patch(`${base}/extracurriculars`, { upsert: [{ id: "ecA", name: "Piano", days: [3], time: "17:00" }] });
+  // device B (stale: has never seen those) adds its own
+  await api.patch(`${base}/field-trips`, { upsert: [{ id: "ftB", date: "2026-11-02", place: "Museum", subjects: "History", countsAttendance: false }] });
+  await api.patch(`${base}/extracurriculars`, { upsert: [{ id: "ecB", name: "Swim", days: [2, 4] }] });
+  let snap = (await api.get(`${base}/snapshot`)).body;
+  assert.deepEqual(snap.fieldTrips.map((t) => t.id), ["ft1", "ft2", "ftA", "ftB"]);
+  assert.deepEqual(snap.extracurriculars.map((e) => e.id), ["ex1", "ecA", "ecB"]);
+  // edit one trip, remove one activity, by id
+  await api.patch(`${base}/field-trips`, { upsert: [{ id: "ftA", date: "2026-11-03", place: "Zoo (moved)", subjects: "Science", countsAttendance: true }] });
+  await api.patch(`${base}/extracurriculars`, { remove: ["ecB", "does-not-exist"] });
+  snap = (await api.get(`${base}/snapshot`)).body;
+  assert.deepEqual(snap.fieldTrips.find((t) => t.id === "ftA"), { id: "ftA", date: "2026-11-03", place: "Zoo (moved)", subjects: "Science", countsAttendance: true });
+  assert.deepEqual(snap.extracurriculars.map((e) => e.id), ["ex1", "ecA"]);
+  assert.equal((await api.patch(`${base}/field-trips`, { upsert: [{ date: "2026-11-01", place: "No id" }] })).status, 400);
+});
+
+test("evaluation and alert settings", async () => {
+  const { api, base } = await seeded();
   await api.put(`${base}/evaluation`, { label: "Evaluation", status: "completed", dueDate: "2027-04-01", showFrom: "2027-03-01" });
   await api.put(`${base}/alert-settings`, { browser: true, apollo: false });
   const snap = (await api.get(`${base}/snapshot`)).body;
-  assert.deepEqual(snap.fieldTrips, [{ date: "2026-11-01", place: "Zoo", countsAttendance: true, id: "x1" }]);
-  assert.deepEqual(snap.extracurriculars, [{ name: "Piano", days: [3], time: "17:00" }]);
   assert.equal(snap.evaluation.status, "completed");
   assert.deepEqual(snap.alertSettings, { browser: true, apollo: false });
 });
 
-test("life-skills catalog: unused skills are deleted, skills with progress are archived", async () => {
+test("life-skills catalog: granular; unused skills are deleted, skills with progress are archived", async () => {
   const { api, base } = await seeded();
-  const out = (await api.put("/api/v1/life-skills", { Kitchen: [{ id: "ls001", title: "Knife skills (renamed)" }], Home: [{ id: "ls009", title: "New skill" }] })).body;
-  assert.deepEqual({ removed: out.removed, archived: out.archived }, { removed: 2, archived: 0 });
-  const snap = (await api.get(`${base}/snapshot`)).body;
-  assert.deepEqual(snap.skillsCatalog, { Kitchen: [{ id: "ls001", title: "Knife skills (renamed)" }], Home: [{ id: "ls009", title: "New skill" }] });
-  // ls001 has progress: dropping it archives instead of deleting, and the progress record is kept
-  const out2 = (await api.put("/api/v1/life-skills", { Home: [{ id: "ls009", title: "New skill" }] })).body;
-  assert.deepEqual({ removed: out2.removed, archived: out2.archived }, { removed: 0, archived: 1 });
-  const snap2 = (await api.get(`${base}/snapshot`)).body;
-  assert.equal(snap2.skills.ls001, true);
-  assert.deepEqual(Object.keys(snap2.skillsCatalog), ["Home"]);
+  // add and rename without touching the others
+  await api.patch("/api/v1/life-skills", { upsert: [{ id: "ls009", category: "Home", title: "New skill" }, { id: "ls001", category: "Kitchen", title: "Knife skills (renamed)" }] });
+  let snap = (await api.get(`${base}/snapshot`)).body;
+  assert.deepEqual(snap.skillsCatalog.Kitchen.map((s) => s.title), ["Knife skills (renamed)", "Cook a meal"]);
+  assert.deepEqual(snap.skillsCatalog.Auto, [{ id: "ls003", title: "Check oil" }], "untouched skills stay");
+  assert.deepEqual(snap.skillsCatalog.Home, [{ id: "ls009", title: "New skill" }]);
+  // remove: ls002 has no progress -> deleted; ls001 has progress -> archived (and the record is kept)
+  const out = (await api.patch("/api/v1/life-skills", { remove: ["ls002", "ls001", "nope"] })).body;
+  assert.deepEqual({ removed: out.removed, archived: out.archived }, { removed: 1, archived: 1 });
+  snap = (await api.get(`${base}/snapshot`)).body;
+  assert.equal(snap.skills.ls001, true, "progress on an archived skill is kept");
+  assert.ok(!JSON.stringify(snap.skillsCatalog).includes("ls001"));
+  // ordering
+  await api.patch("/api/v1/life-skills", { order: ["ls009", "ls003"] });
+  snap = (await api.get(`${base}/snapshot`)).body;
+  assert.deepEqual(Object.keys(snap.skillsCatalog), ["Home", "Auto"]);
+});
+
+test("snapshot: ETag lets an unchanged answer be a tiny 304; responses are not cached otherwise", async () => {
+  const { api, base } = await seeded();
+  const first = await api.raw("GET", `${base}/snapshot`);
+  const etag = first.headers.etag;
+  assert.ok(etag && first.headers["cache-control"] === "no-cache");
+  const same = await api.raw("GET", `${base}/snapshot`, { "if-none-match": etag });
+  assert.equal(same.statusCode, 304);
+  assert.equal(same.body, "");
+  await api.patch(`${base}/log`, { "2026-09-01": { m1: true } });
+  const changed = await api.raw("GET", `${base}/snapshot`, { "if-none-match": etag });
+  assert.equal(changed.statusCode, 200);
+  assert.notEqual(changed.headers.etag, etag);
+  assert.equal((await api.raw("GET", "/api/v1/health")).headers["cache-control"], "no-store");
 });
 
 test("students: create, reject duplicates", async () => {
