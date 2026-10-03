@@ -1,0 +1,17 @@
+# Run from the api/ folder:  docker compose up -d --build
+services:
+  homeschool-api:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    container_name: homeschool-api
+    restart: unless-stopped
+    # Host networking lets the API reach Postgres at 127.0.0.1:5432 (where your postgres container
+    # publishes it). The API listens on 127.0.0.1:3100 only, so nothing outside the server can reach it.
+    network_mode: host
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
