@@ -86,6 +86,7 @@ Found in the 2026-10-04 review. Move into a milestone when they block something.
 - [ ] `db/bin/` duplicates `db/cli/`; keep one (the README documents `cli/`).
 - [ ] Root clutter: `claude-code-prompt.md`, the untouched Vite template README
 - [ ] The laptop clone at D:\coding\liora-academy is behind GitHub. Decide whether it is kept in sync or removed.
+- [ ] **"Today" is computed in UTC, not local time.** `today()` in `src/App.jsx` (and several other `toISOString().split("T")[0]` date keys) use the UTC date, so after about 6 PM Mountain (5 PM in winter) the portal shows tomorrow's lessons. The server timezone does not affect this; it runs in the browser. Fix: one shared local-date helper used everywhere. Small single-file change; do it right after M1, on its own branch.
 - [ ] Login screen shows the default PIN hint (`App.jsx`, "Default PIN: 9999"). Low risk (soft lock), remove when the file is split.
 - [ ] Monthly review of project instructions and dev-standards (next: Nov 4)
 
