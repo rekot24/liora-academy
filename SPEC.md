@@ -35,10 +35,12 @@ Run, and report the tail of each output:
 
 ### 3. [CC] Remove dead leftovers (one commit)
 - Confirm nothing in `src/` still references `server/api.php` or `VITE_API_KEY` / `API_KEY`. Remove any that remain.
-- In `.github/workflows/deploy.yml`, remove the `VITE_API_KEY` env line from the Build step. Change nothing else in that file (the deploy-step atomicity problem is on the ROADMAP issues list, not this milestone).
+- In `.github/workflows/deploy.yml`, make two changes and nothing else:
+  1. Remove the `VITE_API_KEY` env line from the Build step.
+  2. In the "Deploy to web root" step, delete the `rm -rf /var/www/liora-academy/*` line and keep the copy, changed to `cp -r dist/. /var/www/liora-academy/`. The site is never emptied. Old hashed files are no longer cleaned up (rsync is not installed on the server; they are tiny and can be tidied by hand occasionally).
 - `db/bin/` and `db/cli/` hold near-identical scripts. Diff them, keep `db/cli/` (the README documents it), delete `db/bin/`, and confirm `package.json` scripts point at `cli/`.
 - Delete `claude-code-prompt.md` (a one-off prompt that has been used).
-- **Done when:** `grep -rn "api.php\|VITE_API_KEY" src .github` prints nothing, `npm run build` still passes, and the diff touches only those items.
+- **Done when:** `grep -rn "api.php\|VITE_API_KEY" src .github` prints nothing, `npm run build` still passes, and the diff touches only those items. After the merge deploys, the site still loads.
 
 ### 4. [CC] Add the three working docs
 Add `CLAUDE.md`, `ROADMAP.md` and `SPEC.md` at the repo root exactly as drafted by Cowork (Joshua will place the draft files in the repo before this session). Do not edit their content.
