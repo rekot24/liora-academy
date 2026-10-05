@@ -1,4 +1,4 @@
-#!/usr/cli/env node
+#!/usr/bin/env node
 // One-time import of an exported backup JSON (Settings tab -> export) into the database.
 //
 //   node cli/import-legacy.mjs <backup.json> --household "Rollins family" --student Liora --grade 7th [--owner you@example.com]

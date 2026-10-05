@@ -1,4 +1,4 @@
-#!/usr/cli/env node
+#!/usr/bin/env node
 // Applies any unapplied migrations in db/migrations/ to the database in DATABASE_URL.
 // Safe to run repeatedly: applied migrations are recorded in schema_migrations and skipped.
 //   node cli/migrate.mjs

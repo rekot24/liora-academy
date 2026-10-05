@@ -1,4 +1,4 @@
-#!/usr/cli/env node
+#!/usr/bin/env node
 // Writes one student's data in the old backup-JSON shape: a safety net / rollback copy.
 //   node cli/export-legacy.mjs --student Liora > liora-snapshot.json
 // (Do not commit the output: it holds a child's school records.)
