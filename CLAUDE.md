@@ -14,6 +14,7 @@ Liora's Academy: a React/Vite portal at school.theflairhub.com for Liora (12, gr
 4. For every command you give Joshua, say which terminal (VS Code on the server, or PowerShell), which folder, and what it does in one sentence. Show expected output.
 5. Work on a feature branch. `main` must always be deployable; a merge to `main` deploys the front end.
 6. Finish by closing out in ROADMAP.md (log line, tick the milestone) and resetting SPEC.md to its empty template.
+7. Commits: write a detailed message (summary line `type: description`, then Why / What changed / Verified / Notes, per dev-standards Layer 12) and give Joshua the exact commands to run, with the terminal and folder. End with the `Co-Authored-By` trailer your tool specifies.
 
 ## Safety
 
