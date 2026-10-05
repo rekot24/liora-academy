@@ -1,7 +1,7 @@
 # ROADMAP
 
 The path for Liora's Academy. **SPEC.md** is the specifics of the current milestone, **CLAUDE.md** is how to work and where things are.
-Plan changes happen in chat first, then land here. Last updated: 2026-10-04.
+Plan changes happen in chat first, then land here. Last updated: 2026-10-05.
 
 **Goal:** an interactive, AI-assisted classical education plus everyday skills a traditional school skips, for Liora (grade 7) and Amari (grade 8, joins in January 2027). Colorado requirements are the floor, not the goal.
 
@@ -13,20 +13,20 @@ Plan changes happen in chat first, then land here. Last updated: 2026-10-04.
 
 - Public access is live: Cloudflare Tunnel plus Cloudflare Access (email code). At home there is no login (accepted).
 - Postgres database `homeschool` is live with schema migrations 001 and 002. The API container (`homeschool-api`) is deployed behind Nginx at `/api/`. Real export imported: household "Wallace family", student Liora.
-- The portal front end that talks to the API is built on branch `feat/frontend-api-sync` (4 commits, tested). It has **no pull request yet and is not on `main`**, so the live portal is still on the old sync. `main` does not contain `db/` or `api/` yet.
+- The API-backed portal is on `main` and live (M1, 2026-10-05). It syncs only through the API; the old PHP sync is gone. `main` contains everything the server runs (`db/`, `api/`, the front end).
+- Nightly database backup runs from cron (`db/backup.sh`, 02:15).
 
 ## Done
 
 - [x] 2026-10-02 Cloudflare Tunnel + Access in front of school.theflairhub.com; router port forwards removed
 - [x] 2026-10-02 Schema design and migration 001 on the homeserver
 - [x] 2026-10-03 API deployed, migration 002, real data imported
-- [x] 2026-10-03 Front end switched to change-only API sync (on branch, not merged)
+- [x] 2026-10-03 Front end switched to change-only API sync
+- [x] 2026-10-05 M1 Cutover: API-backed portal merged to `main` and live; old PHP sync retired
 
 ## Now
 
-### M1: Cutover (target: Sun Oct 11)
-Get the API-backed portal onto `main` and live, and retire the old sync. Details in SPEC.md.
-Done when: the live portal reads and writes through the API, the deletion bug cannot be reproduced, a nightly backup exists, and `main` contains everything the server runs.
+Nothing in progress. M2 is next; its SPEC is written in chat first.
 
 ## Next (in order)
 
@@ -79,19 +79,20 @@ These matter more to the goal than any milestone above. They need dates because 
 
 Found in the 2026-10-04 review. Move into a milestone when they block something.
 
-- [ ] Delete the unused GitHub Actions secrets: FTP_HOST, FTP_USERNAME, FTP_PASSWORD, SSH_PRIVATE_KEY (and VITE_API_KEY once removed from the workflow). Two minutes, no code.
+- [ ] Delete the unused GitHub Actions secrets: FTP_HOST, FTP_USERNAME, FTP_PASSWORD, SSH_PRIVATE_KEY, VITE_API_KEY (no longer used by the workflow since M1). Two minutes, no code.
 - [ ] `liora-homeschool-plan.md` is in a public repo and contains personal details about Liora. Scrub it or move it out of the repo.
-- [ ] Deploy step does `rm -rf /var/www/liora-academy/*` before copying: the site is empty or half-updated during every deploy, a failed copy leaves it empty, and no previous build is kept for rollback. Proposed fix (decided in chat 2026-10-04, pending approval): publish each build to a new release folder and switch a `current` symlink atomically; rollback becomes one command. Needs a one-time server prep and a one-line Nginx `root` change.
+- [ ] Old hashed asset files accumulate in `/var/www/liora-academy/assets` because the deploy now copies with `cp -r dist/.` and never deletes. They are tiny; tidy by hand occasionally.
 - [ ] `AUTO_MIGRATE=true` applies new migrations the moment the API container restarts, ahead of any backup. Consider `false` plus a manual `npm run migrate` after `db/backup.sh`.
-- [ ] `db/bin/` duplicates `db/cli/`; keep one (the README documents `cli/`).
-- [ ] Root clutter: `claude-code-prompt.md`, the untouched Vite template README
+- [ ] Root clutter: the untouched Vite template README
 - [ ] The laptop clone at D:\coding\liora-academy is behind GitHub. Decide whether it is kept in sync or removed.
 - [ ] **"Today" is computed in UTC, not local time.** `today()` in `src/App.jsx` (and several other `toISOString().split("T")[0]` date keys) use the UTC date, so after about 6 PM Mountain (5 PM in winter) the portal shows tomorrow's lessons. The server timezone does not affect this; it runs in the browser. Fix: one shared local-date helper used everywhere. Small single-file change; do it right after M1, on its own branch.
 - [ ] Login screen shows the default PIN hint (`App.jsx`, "Default PIN: 9999"). Low risk (soft lock), remove when the file is split.
+- [ ] After a deploy, a browser can keep serving the cached old front end until a hard refresh (found during M1 verification). Likely fix: a short no-cache header for `index.html` in Nginx (hashed assets can stay cached). Do not change Nginx without its own SPEC.
 - [ ] Monthly review of project instructions and dev-standards (next: Nov 4)
 
 ## Log
 
 Newest first. One line per finished milestone: date, what shipped, decisions worth keeping.
 
+- 2026-10-05 M1 Cutover shipped: the portal reads and writes through the API, the deletion bug no longer reproduces (all six live checks passed), and `main` holds `db/`, `api/` and the new front end. Decisions: merged with a merge commit so `git revert -m 1 <merge>` undoes the cutover in one step; the deploy copies with `cp -r dist/.` instead of `rm -rf` then copy, so the site is never empty; rollback is git revert, push, redeploy (release folders and symlinks decided against on 2026-10-04); db and api tests use in-memory PGlite and never touch the live database. Also removed `db/bin/`, `claude-code-prompt.md` and `VITE_API_KEY` from the build.
 - 2026-10-04 ROADMAP.md created; M1 specified.
