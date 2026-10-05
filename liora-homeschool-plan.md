@@ -516,6 +516,9 @@ Summer ended with a working but summer-lite version of the portal live. Before F
 
 ### Shared Server Sync (added August 2026, right after the Fall rebuild)
 
+> ⚠️ **Superseded October 2026.** The PHP endpoint and single JSON file described below are replaced by a Postgres database (`homeschool`, in Docker on the homelab) behind a small HTTP API (`api/`, served at `/api/v1` through Nginx). The portal loads a student snapshot from the API and, on every save, sends only what changed (`src/lib/syncClient.js`), so an out-of-date device can no longer overwrite newer work. `localStorage` remains the instant-load cache, and queued edits survive a reload and retry when the network is back. See `db/README.md` and `api/README.md`. The text below is kept as history.
+
+
 The original Fall 2026 rebuild still had each device (PC, phone, Apollosign) keeping its own private `localStorage` — meaning nothing synced between devices at all. That became a real problem once the plan was "edit on the PC, but also check things off directly on the Apollosign and have it stick everywhere."
 
 **What changed:** added a tiny PHP endpoint (`server/api.php`) that reads/writes one JSON file (`server/data/state.json`) on the Hostinger server. Every device now:

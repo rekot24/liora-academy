@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { queueWrite, fetchServerState, onSyncStatusChange, isBusy, forgetEtag, restorePending, restoreToServer } from "./lib/syncClient.js";
+import { SYNC_POLL_MS as SERVER_POLL_MS } from "./constants/index.js";
 
 // ─── INITIAL DATA ────────────────────────────────────────────────────────────
 
@@ -172,10 +174,23 @@ function load(key, fallback) {
   } catch { return fallback; }
 }
 
+/** Maps a localStorage key ("hs_log") back to the store name the sync uses ("log"). */
+const STORAGE_NAME_BY_KEY = Object.fromEntries(Object.entries(STORAGE_KEYS).map(([name, key]) => [key, name]));
+
+/**
+ * Save one store: write it to localStorage (the instant local cache), refresh the auto-save
+ * file, and hand the sync the before and after so it can send just the change to the server.
+ * @param {string} key - the localStorage key, from STORAGE_KEYS
+ * @param {any} val - the store's new value
+ * @returns {void}
+ */
 function save(key, val) {
+  // what this store held a moment ago, so the sync can work out exactly what the edit changed
+  let before;
+  try { const raw = localStorage.getItem(key); before = raw ? JSON.parse(raw) : undefined; } catch { before = undefined; }
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
   scheduleAutoSaveWrite();
-  scheduleServerPush();
+  queueWrite(STORAGE_NAME_BY_KEY[key], before, val);
 }
 
 // ─── AUTO-SAVE TO FILE (File System Access API, Chrome/Edge) ──────────────────
@@ -305,63 +320,22 @@ function restoreBackupSnapshot(snapshot) {
 
 // ─── SHARED SERVER SYNC ─────────────────────────────────────────────────────
 //
-// The single source of truth is one JSON file living on the server
-// (server/api.php + data/state.json). Every device — PC, phone, Apollosign —
-// reads and writes through this same endpoint, instead of each device
-// keeping its own isolated localStorage copy. localStorage is still used as
-// a fast local cache so the UI paints instantly, but the server is what's
-// actually authoritative.
-//
-// SETUP: change API_KEY here to match the one set in server/api.php, and
-// change API_URL if the app isn't hosted at school.theflairhub.com.
+// The source of truth is the homeschool database on the server, reached through the API at
+// /api/v1 (see src/lib/syncClient.js). Every device loads the same data from it, and every save sends
+// only what changed (not the whole app state), so an out-of-date device can't overwrite
+// newer work. localStorage is still used as a fast local cache so the UI paints instantly.
 
-const API_URL = "https://school.theflairhub.com/server/api.php";
-const API_KEY = import.meta.env.VITE_API_KEY;
-const SERVER_POLL_MS = 25000; // how often devices check for changes made elsewhere
-const SERVER_PUSH_DEBOUNCE_MS = 1200;
+const onServerSyncStatusChange = onSyncStatusChange;
 
-let _serverPushTimer = null;
-let _serverSyncListeners = [];
-let _lastServerSavedAt = null; // guards against a poll clobbering a save that's still in flight
-
-function onServerSyncStatusChange(fn) { _serverSyncListeners.push(fn); return () => { _serverSyncListeners = _serverSyncListeners.filter(f => f !== fn); }; }
-function emitServerSyncStatus(status) { _serverSyncListeners.forEach(fn => fn(status)); }
-
-async function fetchServerState() {
-  try {
-    const res = await fetch(`${API_URL}?key=${encodeURIComponent(API_KEY)}`, { headers: { "X-Api-Key": API_KEY } });
-    if (!res.ok) { emitServerSyncStatus({ online: false, error: `HTTP ${res.status}` }); return null; }
-    const data = await res.json();
-    if (data.exists === false) { emitServerSyncStatus({ online: true, empty: true }); return null; }
-    emitServerSyncStatus({ online: true, lastSyncedAt: new Date().toISOString(), serverSavedAt: data._serverSavedAt });
-    return data;
-  } catch (err) {
-    emitServerSyncStatus({ online: false, error: "Network error" });
-    return null;
-  }
-}
-
-async function pushServerState(snapshot) {
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": API_KEY },
-      body: JSON.stringify(snapshot),
-    });
-    if (!res.ok) { emitServerSyncStatus({ online: false, error: `HTTP ${res.status}` }); return false; }
-    const data = await res.json();
-    _lastServerSavedAt = data.savedAt;
-    emitServerSyncStatus({ online: true, lastSyncedAt: new Date().toISOString(), serverSavedAt: data.savedAt });
-    return true;
-  } catch (err) {
-    emitServerSyncStatus({ online: false, error: "Network error" });
-    return false;
-  }
-}
-
-function scheduleServerPush() {
-  clearTimeout(_serverPushTimer);
-  _serverPushTimer = setTimeout(() => pushServerState(collectBackupSnapshot()), SERVER_PUSH_DEBOUNCE_MS);
+/**
+ * Field trips and activities need an id so the server can tell them apart. Gives any entry
+ * that lacks one a new id (the app's own forms already add one, so this is a safety net).
+ * @param {Array<object>} list
+ * @returns {Array<object>} the same entries, every one with an id
+ */
+function ensureIds(list) {
+  const newId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+  return (list || []).map(item => (item && !item.id ? { ...item, id: newId() } : item));
 }
 
 function today() {
@@ -2470,16 +2444,16 @@ function SettingsTab({ alertSettings, onUpdateAlertSettings }) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
+      let snapshot;
+      try { snapshot = JSON.parse(ev.target.result); } catch { alert("That file doesn't look like a valid backup."); return; }
+      if (!confirm("This will make the shared server copy (and this device) match the backup file exactly, including removing anything not in the file. Continue?")) return;
       try {
-        const snapshot = JSON.parse(ev.target.result);
-        if (confirm("This will overwrite current data on this device AND push it to the shared server copy. Continue?")) {
-          restoreBackupSnapshot(snapshot);
-          pushServerState(collectBackupSnapshot());
-          alert("Restored. Reloading...");
-          window.location.reload();
-        }
-      } catch { alert("That file doesn't look like a valid backup."); }
+        await restoreToServer(snapshot);
+        restoreBackupSnapshot(snapshot);
+        alert("Restored. Reloading...");
+        window.location.reload();
+      } catch (err) { alert(`Couldn't restore: ${err.message}. Nothing was changed on this device.`); }
     };
     reader.readAsText(file);
   }
@@ -2532,7 +2506,7 @@ function SettingsTab({ alertSettings, onUpdateAlertSettings }) {
           <span style={{ fontSize: 11, color: serverStatus.online ? "#34d399" : serverStatus.online === false ? "#f87171" : "#64748b" }}>{serverLabel}</span>
         </div>
         <p style={{ color: "#64748b", fontSize: 12 }}>
-          This is the real source of truth — every device (this PC, phones, the Apollosign) reads and writes the same file on the server. Checking something off anywhere shows up everywhere else within about {Math.round(SERVER_POLL_MS / 1000)} seconds.
+          This is the real source of truth: every device (this PC, phones, the Apollosign) reads and writes the same database on the server. Each change saves only what you changed, and checking something off anywhere shows up everywhere else within about {Math.round(SERVER_POLL_MS / 1000)} seconds.{serverStatus.pending ? ` ${serverStatus.pending} change${serverStatus.pending !== 1 ? "s" : ""} waiting to send.` : ""}
         </p>
       </div>
 
@@ -3047,32 +3021,27 @@ export default function App() {
     });
   }
 
-  // On first load: try to pull the shared server state. If the server has
-  // nothing yet (first run), fall back to generating a schedule locally and
-  // push it up to initialize the shared copy.
+  // On first load: send any edits that were queued but never sent (tab closed, network down),
+  // then pull the shared server state into the screen. If the server can't be reached we just
+  // keep showing the local cache, and edits queue up and send later.
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      restorePending();
       const serverData = await fetchServerState();
-      if (cancelled) return;
-      if (serverData) {
-        hydrateFromSnapshot(serverData);
-      } else if (Object.keys(schedule).length === 0 && activeSemester) {
-        const { schedule: generated } = generateSchedule(activeSemester, coursesCatalog, pattern, overrides);
-        setSchedule(generated);
-        save(STORAGE_KEYS.schedule, generated);
-      } else {
-        pushServerState(collectBackupSnapshot());
-      }
+      if (cancelled || !serverData) return;
+      if (isBusy()) forgetEtag(); else hydrateFromSnapshot(serverData);
     })();
     return () => { cancelled = true; };
   }, []);
 
-  // Poll for changes made on other devices while this tab stays open
+  // Poll for changes made on other devices while this tab stays open. Never replace the screen
+  // while edits are still waiting to be sent, or an unsent edit could be wiped.
   useEffect(() => {
     const interval = setInterval(async () => {
       const serverData = await fetchServerState();
-      if (serverData) hydrateFromSnapshot(serverData);
+      if (!serverData) return;
+      if (isBusy()) forgetEtag(); else hydrateFromSnapshot(serverData);
     }, SERVER_POLL_MS);
     return () => clearInterval(interval);
   }, []);
@@ -3203,8 +3172,8 @@ export default function App() {
     save(STORAGE_KEYS.schedule, next);
   }
   function handleUpdateSkillsCatalog(next) { setSkillsCatalog(next); save(STORAGE_KEYS.skillsCatalog, next); }
-  function handleUpdateFieldTrips(next) { setFieldTrips(next); save(STORAGE_KEYS.fieldTrips, next); }
-  function handleUpdateExtracurriculars(next) { setExtracurriculars(next); save(STORAGE_KEYS.extracurriculars, next); }
+  function handleUpdateFieldTrips(next) { const withIds = ensureIds(next); setFieldTrips(withIds); save(STORAGE_KEYS.fieldTrips, withIds); }
+  function handleUpdateExtracurriculars(next) { const withIds = ensureIds(next); setExtracurriculars(withIds); save(STORAGE_KEYS.extracurriculars, withIds); }
   function handleUpdateEvaluation(next) { setEvaluation(next); save(STORAGE_KEYS.evaluation, next); }
   function handleUpdateAlerts(next) { setAlerts(next); save(STORAGE_KEYS.alerts, next); }
   function handleUpdateAlertSettings(next) { setAlertSettings(next); save(STORAGE_KEYS.alertSettings, next); }

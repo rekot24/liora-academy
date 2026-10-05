@@ -23,10 +23,7 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
 
       - name: Deploy to web root
         run: |
-          rm -rf /var/www/liora-academy/*
-          cp -r dist/* /var/www/liora-academy/
+          cp -r dist/. /var/www/liora-academy/

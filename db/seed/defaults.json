@@ -1,0 +1,240 @@
+{
+  "_comment": "Defaults applied when a NEW household is created. Extracted from the constants that used to be hardcoded in src/App.jsx (INITIAL_LIFE_SKILLS, DEFAULT_PATTERN). Edit here, not in the app. No lessons are seeded: the lesson catalog starts empty.",
+  "lifeSkills": {
+    "Kitchen & Home": [
+      {
+        "id": "ls001",
+        "title": "Basic knife skills and kitchen safety"
+      },
+      {
+        "id": "ls002",
+        "title": "Cook 5 meals from scratch"
+      },
+      {
+        "id": "ls003",
+        "title": "Meal plan a week on a budget"
+      },
+      {
+        "id": "ls004",
+        "title": "Grocery shop with a list and budget"
+      },
+      {
+        "id": "ls005",
+        "title": "Food storage and expiration dates"
+      },
+      {
+        "id": "ls006",
+        "title": "Unclog a drain"
+      },
+      {
+        "id": "ls007",
+        "title": "Change an air filter"
+      },
+      {
+        "id": "ls008",
+        "title": "Do a load of laundry start to finish"
+      }
+    ],
+    "Financial Literacy": [
+      {
+        "id": "ls009",
+        "title": "Read a bank statement"
+      },
+      {
+        "id": "ls010",
+        "title": "Build and manage a personal budget"
+      },
+      {
+        "id": "ls011",
+        "title": "Understand gross vs. net pay"
+      },
+      {
+        "id": "ls012",
+        "title": "How credit cards and interest work"
+      },
+      {
+        "id": "ls013",
+        "title": "What a credit score is"
+      },
+      {
+        "id": "ls014",
+        "title": "Understand a utility bill"
+      },
+      {
+        "id": "ls015",
+        "title": "Open a savings account"
+      }
+    ],
+    "Auto & Mechanical": [
+      {
+        "id": "ls016",
+        "title": "Check and add oil"
+      },
+      {
+        "id": "ls017",
+        "title": "Check tire pressure and inflate"
+      },
+      {
+        "id": "ls018",
+        "title": "Check coolant and brake fluid"
+      },
+      {
+        "id": "ls019",
+        "title": "Change a flat tire"
+      },
+      {
+        "id": "ls020",
+        "title": "Jump a dead battery"
+      },
+      {
+        "id": "ls021",
+        "title": "Read dashboard warning lights"
+      }
+    ],
+    "Trade & Handyman": [
+      {
+        "id": "ls022",
+        "title": "Name and use 10 common tools"
+      },
+      {
+        "id": "ls023",
+        "title": "Measure accurately with a tape measure"
+      },
+      {
+        "id": "ls024",
+        "title": "Use a level and a square"
+      },
+      {
+        "id": "ls025",
+        "title": "Safe tool handling on a job site"
+      },
+      {
+        "id": "ls026",
+        "title": "Assist with a real repair job"
+      },
+      {
+        "id": "ls027",
+        "title": "Understand how a quote becomes an invoice"
+      },
+      {
+        "id": "ls028",
+        "title": "Professional client interaction"
+      }
+    ],
+    "Health & Wellness": [
+      {
+        "id": "ls029",
+        "title": "Basic first aid — cuts, burns, sprains"
+      },
+      {
+        "id": "ls030",
+        "title": "When to use ER vs urgent care vs doctor"
+      },
+      {
+        "id": "ls031",
+        "title": "Understand a health insurance card"
+      },
+      {
+        "id": "ls032",
+        "title": "Read a prescription label"
+      },
+      {
+        "id": "ls033",
+        "title": "Recognize signs of stress and anxiety"
+      }
+    ],
+    "Digital & Life Admin": [
+      {
+        "id": "ls034",
+        "title": "Write a professional email"
+      },
+      {
+        "id": "ls035",
+        "title": "Organize digital and paper files"
+      },
+      {
+        "id": "ls036",
+        "title": "Recognize online scams"
+      },
+      {
+        "id": "ls037",
+        "title": "Fill out a job application"
+      },
+      {
+        "id": "ls038",
+        "title": "Understand a basic contract or lease"
+      },
+      {
+        "id": "ls039",
+        "title": "Navigate DMV and government websites"
+      }
+    ]
+  },
+  "weeklyPattern": [
+    {
+      "subject": "Math",
+      "days": [
+        1,
+        3,
+        5
+      ]
+    },
+    {
+      "subject": "Reading",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "subject": "Writing",
+      "days": [
+        2,
+        4
+      ]
+    },
+    {
+      "subject": "Speaking",
+      "days": [
+        2,
+        4
+      ]
+    },
+    {
+      "subject": "Science",
+      "days": [
+        2,
+        4
+      ]
+    },
+    {
+      "subject": "History",
+      "days": [
+        1
+      ]
+    },
+    {
+      "subject": "Civics",
+      "days": [
+        3
+      ]
+    },
+    {
+      "subject": "Literature",
+      "days": [
+        5
+      ]
+    },
+    {
+      "subject": "Constitution",
+      "days": [
+        1
+      ]
+    }
+  ]
+}
