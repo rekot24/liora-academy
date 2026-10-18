@@ -25,7 +25,7 @@ Liora's Academy: a React/Vite portal at school.theflairhub.com for Liora (12, gr
 
 ## Architecture and where things are
 
-- **Front end:** React + Vite in `src/`. `src/App.jsx` is still one large file (see deviations). `src/lib/syncClient.js` does the API sync; `src/constants/index.js` holds named values. Browser keeps a localStorage cache; the server is authoritative.
+- **Front end:** React + Vite in `src/`. `src/App.jsx` is still one large file (see deviations). A parallel rebuild is planned (ROADMAP "Rebuild track"); until a SPEC says otherwise, keep changes to `src/` small and do not restructure it. `src/lib/syncClient.js` does the API sync; `src/constants/index.js` holds named values. Browser keeps a localStorage cache; the server is authoritative.
 - **API:** Fastify in `api/`, Docker container `homeschool-api`, listens on `127.0.0.1:3100`, Nginx forwards `/api/` to it. Identity is decided only in `api/src/auth.mjs`. Details: `api/README.md`, `api/DEPLOY.md`.
 - **Database:** Postgres in the Docker container `postgres` (superuser `life`), database `homeschool`, app login `homeschool_app`. Schema and migrations in `db/` (numbered, immutable: add a new file, never edit an applied one). Design decisions: `db/DESIGN.md`.
 - **Access:** public through Cloudflare Tunnel + Cloudflare Access (email code). On the home network there is no login.
@@ -48,9 +48,9 @@ Liora's Academy: a React/Vite portal at school.theflairhub.com for Liora (12, gr
 | Deviation | Why | Fixed by |
 |---|---|---|
 | Standards assume Supabase and Vercel; this project uses self-hosted Postgres, Fastify and Cloudflare | Chosen Oct 2026: no spare RAM for self-hosted Supabase, data stays at home | Standards proposal: add a self-hosted stack variant |
-| `src/App.jsx` is one ~3,400-line file with inline styles | Grew organically before the standards were adopted | ROADMAP M4 |
-| No settings store, feature flags, logger or error boundary in the front end | Same | ROADMAP M4 |
-| No `app_logs` table | Not needed yet | Revisit with M4 |
+| `src/App.jsx` is one ~3,400-line file with inline styles | Grew organically before the standards were adopted | ROADMAP Rebuild track (R1 to R5) |
+| No settings store, feature flags, logger or error boundary in the front end | Same | ROADMAP Rebuild track (R1) |
+| No `app_logs` table | Not needed yet | Revisit with R1 |
 | Student PINs are client-side soft locks | Family tool behind Cloudflare Access | Per-person logins (Later) |
 
 ## Where facts live
