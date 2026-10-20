@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instruction mockup: The Great Compromise</title>
+<style>
+:root{
+  --bg:#f6f4ef; --card:#ffffff; --ink:#1f2933; --muted:#5b6770; --line:#d9d4c7;
+  --accent:#2f5d8a; --accent-ink:#ffffff; --good:#2e7d4f; --good-bg:#e4f3ea;
+  --bad:#b23a3a; --bad-bg:#f8e5e5; --teach:#7a4a12; --teach-bg:#fdf1dc; --focus:#e0a100;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161a1f;--card:#202630;--ink:#eef1f4;--muted:#a3adb8;--line:#38414d;--accent:#7fb2e5;--accent-ink:#0f1a26;
+  --good:#7ad39b;--good-bg:#173626;--bad:#f09a9a;--bad-bg:#3d1f1f;--teach:#f2c78a;--teach-bg:#33260f;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header .title{font-weight:700;flex:1;min-width:200px}
+.chip{font-size:14px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.chip.block{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.toggle{padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.toggle[aria-pressed=true]{background:var(--teach-bg);color:var(--teach);border-color:var(--teach)}
+.layout{display:grid;grid-template-columns:1fr;gap:20px;max-width:1200px;margin:0 auto;padding:20px}
+.layout.teacher{grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr)}
+@media(max-width:860px){.layout.teacher{grid-template-columns:1fr}}
+.stage{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:32px;min-height:440px;display:flex;flex-direction:column}
+.stage h1{font-size:30px;line-height:1.2;margin:0 0 16px}
+.stage h2{font-size:26px;line-height:1.25;margin:0 0 16px}
+.stage p{margin:0 0 14px}
+.big{font-size:22px}
+.muted{color:var(--muted)}
+.body{flex:1}
+.nav{display:flex;align-items:center;gap:12px;margin-top:24px}
+.nav .spacer{flex:1}
+.btn{padding:10px 20px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.secondary{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.dots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--line);border:none;padding:0}
+.dot.done{background:var(--accent);opacity:.55}
+.dot.now{background:var(--accent);transform:scale(1.35)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.fact{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--bg);text-align:left;color:var(--ink)}
+.fact b{display:block;margin-bottom:4px}
+.fact.hidden .more{display:none}
+.fact.hidden{border-style:dashed;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.two{grid-template-columns:1fr}}
+.plan{border:2px solid var(--line);border-radius:14px;padding:16px;background:var(--bg)}
+.plan h3{margin:0 0 6px;font-size:20px}
+.plan ul{margin:8px 0 0;padding-left:20px}
+.opts{display:grid;gap:10px;margin:8px 0}
+.opt{text-align:left;padding:12px 16px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt.sel{border-color:var(--accent);background:var(--card)}
+.opt.right{border-color:var(--good);background:var(--good-bg)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.opt:disabled{cursor:default;color:var(--ink)}
+.feedback{margin-top:10px;padding:12px 14px;border-radius:10px;border-left:5px solid var(--accent);background:var(--bg)}
+.feedback.good{border-color:var(--good);background:var(--good-bg)}
+.feedback.bad{border-color:var(--bad);background:var(--bad-bg)}
+.diagram{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+@media(max-width:620px){.diagram{grid-template-columns:1fr}}
+.house{border:2px solid var(--accent);border-radius:14px;padding:14px;text-align:center;background:var(--bg);color:var(--ink);width:100%}
+.house .big{font-weight:700;display:block}
+.house .detail{display:none;margin-top:8px;font-size:17px}
+.house.open .detail{display:block}
+.seats{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.seat{width:16px;height:16px;border-radius:50%;background:var(--accent);opacity:.8}
+.seat.s2{background:var(--good)}
+textarea,input[type=number],select,input[type=text]{width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+textarea{min-height:72px;resize:vertical}
+.side{background:var(--teach-bg);color:var(--ink);border:1px solid var(--teach);border-radius:16px;padding:20px;align-self:start;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+.side h3{margin:0 0 8px;color:var(--teach);font-size:16px;text-transform:uppercase;letter-spacing:.05em}
+.side h4{margin:14px 0 4px;font-size:15px;color:var(--teach)}
+.side p,.side li{font-size:16px;margin:0 0 6px}
+.side ul{padding-left:20px;margin:0}
+.side label{display:block;font-size:15px;margin:12px 0 4px;font-weight:600}
+.score{font-size:48px;font-weight:800;margin:0}
+.badge{display:inline-block;padding:4px 12px;border-radius:99px;font-weight:700;font-size:15px}
+.badge.m{background:var(--good-bg);color:var(--good)}
+.badge.p{background:var(--teach-bg);color:var(--teach)}
+table{border-collapse:collapse;width:100%;margin-top:8px}
+td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;font-size:16px}
+.note{font-size:14px;color:var(--muted)}
+.banner{max-width:1200px;margin:12px auto 0;padding:0 20px;font-size:14px;color:var(--muted)}
+.portrait{margin:0;position:relative;text-align:center;width:130px;flex:none}
+.portrait svg{width:100%;height:auto;display:block}
+.portrait figcaption{font-size:14px;line-height:1.3;margin-top:6px}
+.portrait .ph{position:absolute;top:6px;left:6px;font-size:11px;background:var(--teach-bg);color:var(--teach);border-radius:6px;padding:1px 6px}
+.withimg{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.withimg>.grow{flex:1;min-width:240px}
+.plan .portrait{float:right;margin:0 0 8px 12px;width:96px}
+.bgslot{position:relative;border-radius:16px;overflow:hidden}
+.stage.hasbg{background-image:linear-gradient(rgba(255,255,255,.82),rgba(255,255,255,.82)),var(--bgimg);background-size:cover;background-position:center}
+@media(prefers-color-scheme:dark){.stage.hasbg{background-image:linear-gradient(rgba(20,26,34,.85),rgba(20,26,34,.85)),var(--bgimg)}}
+.bgnote{font-size:12px;color:var(--muted);margin-top:8px}
+.tilemap{display:grid;grid-template-columns:repeat(6,56px);grid-auto-rows:44px;gap:4px;justify-content:center;margin:8px auto}
+.tile{border-radius:8px;border:2px solid transparent;font-weight:700;font-size:15px;color:#fff;padding:0}
+.tile.big{background:var(--accent);color:var(--accent-ink)}
+.tile.small{background:var(--good);color:#fff}
+.tile.sel{border-color:var(--ink);transform:scale(1.08)}
+.tile.none{background:transparent;border:2px dashed var(--muted);color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:14px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.trail{margin-top:14px;border:2px dashed var(--accent);border-radius:12px;padding:12px 14px;background:var(--bg)}
+.trail .vid{margin:8px 0;padding:22px;border-radius:10px;background:var(--line);text-align:center;color:var(--muted);font-size:15px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--teach-bg);color:var(--teach);margin-left:6px}
+.ctl{font-size:13px;color:var(--muted);margin-bottom:6px}
+.ctl b{color:var(--ink)}
+.pace{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.pace button{padding:6px 10px;border-radius:8px;border:1px solid var(--teach);background:transparent;color:var(--teach);font-size:14px}
+.pace button[aria-pressed=true]{background:var(--teach);color:var(--teach-bg)}
+.tnav{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.tnav .btn{padding:6px 14px;font-size:15px}
+pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">US History · The Constitutional Convention and the Great Compromise</div>
+  <span class="chip block" id="blockChip"></span>
+  <span class="chip" id="timeChip"></span>
+  <button class="toggle" id="viewToggle" aria-pressed="false">Teacher view: off</button>
+</header>
+<div class="banner">Mockup v2 for review only. Nothing here is saved. Pictures marked "placeholder" are stand-ins; the real build would use public-domain images (Library of Congress, Wikimedia Commons). Left and right arrow keys act as the teacher's controls.</div>
+<div class="layout" id="layout">
+  <main class="stage" id="stage" aria-live="polite"></main>
+  <aside class="side" id="side" hidden></aside>
+</div>
+
+<script>
+// ---------- Lesson content: this is the shape the real format would hold ----------
+const lesson = {
+  title: "The Constitutional Convention and the Great Compromise",
+  quiz: [
+    {q:"Which was a weakness of the Articles of Confederation?", a:["Congress could not collect taxes","The president had too much power","Only large states could vote","Judges served for life"], c:0,
+     why:"Congress had to ask the states for money and could not force them to pay."},
+    {q:"The Virginia Plan said each state's votes should depend on what?", a:["Its size in land","Its population","Its wealth","Its age as a colony"], c:1,
+     why:"Big states liked this because more people meant more votes."},
+    {q:"Which states mostly supported the New Jersey Plan?", a:["Small states","Large states","Southern states only","Coastal states only"], c:0,
+     why:"Small states feared being outvoted, so they wanted one vote per state."},
+    {q:"How many senators does each state get?", a:["One","Two","It depends on population","Twelve"], c:1,
+     why:"Every state has two senators, no matter its size."},
+    {q:"What decides how many seats a state has in the House?", a:["Equal seats for every state","The governor's choice","Its population","Its year of statehood"], c:2,
+     why:"More people means more representatives. This was the big-state half of the deal."}
+  ],
+  screens: [
+    {type:"intro", block:2, mins:1, control:"teacher", bg:"Independence Hall painting or a period map of the 13 states", title:"How do you build a fair government?",
+     body:"<p class='big'>Imagine 13 groups, some big and some small, all have to agree on one set of rules. Each group wants a fair say.</p><p class='big'>Today: how the founders solved exactly that problem in the summer of 1787.</p>",
+     teach:{say:"Open with the fairness question before any dates. Ask: if you and a much bigger group had to share one vote, what would feel fair?", ask:"Let her answer in her own words; do not correct yet. Come back to this answer at the end.", watch:"Gauge prior knowledge. If the Articles of Confederation come up, great; if not, the next screen covers it.", time:"About 1 minute"}},
+    {type:"facts", block:2, mins:2, control:"teacher", title:"First, the government was too weak",
+     trail:{title:"Side trail: Shays' Rebellion", tag:"optional", body:"In 1786 and 1787, farmers in western Massachusetts were losing their farms to debts and taxes. Led by Daniel Shays, a Revolution veteran, they shut down courts and marched on a weapons storehouse in Springfield. Militia scattered them in January 1787. The weak national government could not respond, and leaders took notice.", vid:"2-minute explainer video (embed slot)"},
+     lead:"After the Revolution the states ran under the Articles of Confederation. Tap each card.",
+     facts:[["No power to tax","Congress had to ask states for money, and states often did not pay."],["No national army","Congress had to ask the states for soldiers."],["One vote per state, and 9 of 13 to pass anything","Hard to get anything done."],["Changing the rules needed all 13 states","One state could block any fix."]],
+     teach:{say:"Do the cards one at a time. After each, ask: what problem would this cause?", ask:"Which of these four would hurt the most if you were running the country?", watch:"Reveal-by-tap keeps attention. The Shays' Rebellion side trail is optional: open it if she is curious, or tap Save for later to put it on the explore-later list and keep moving. It is a short video or a future lesson, not a rabbit hole.", time:"About 2 minutes"}},
+    {type:"check", block:2, mins:1, control:"student", id:"c1", title:"Quick check",
+     q:"Congress under the Articles could not raise money by itself. Why was that such a problem?",
+     a:["It could not pay soldiers or debts","It had too much money","Taxes were too high","It did not need money"], c:0,
+     why:"A government that cannot pay its bills or its army cannot protect or run a country.",
+     teach:{say:"Give her a few seconds before she answers. No hints yet.", ask:"If she misses it, go back one screen and re-read the first card together.", watch:"This is retrieval practice, so the point is recall, not the score.", time:"About 1 minute"}},
+    {type:"info", block:2, mins:2, control:"teacher", title:"Philadelphia, 1787", portrait:["George Washington","1732 to 1799","Presided over the convention"],
+     body:"<div class='cards'><div class='fact'><b>When</b>May to September 1787</div><div class='fact'><b>Where</b>Philadelphia, in what is now Independence Hall</div><div class='fact'><b>Who</b>55 delegates from 12 states (Rhode Island did not send anyone). George Washington presided.</div><div class='fact'><b>Plan</b>Meant to fix the Articles. They wrote a brand new Constitution instead.</div></div><p class='note' style='margin-top:14px'>Delegates met in secret with the windows closed so they could argue freely.</p>",
+     teach:{say:"Keep this short. The people matter less than the plot: they came to patch the old rules and threw them out.", ask:"Why might they have kept the meetings secret?", watch:"Optional detour if interest is high: why Rhode Island stayed away. Skip it if time is tight.", time:"About 2 minutes"}},
+    {type:"map", block:2, mins:2, control:"teacher", title:"The 13 states were very different sizes",
+     body:"", teach:{say:"Let her tap around. Ask her to find the biggest and the smallest before you say anything.", ask:"If every state gets one vote, is that fair to Virginia? If votes follow population, is that fair to Delaware?", watch:"Population figures are from the 1790 census and include enslaved people. Virginia had more than twelve times as many people as Delaware. Rhode Island sent no delegates; it is shown dashed.", time:"About 2 minutes"}},
+    {type:"plans", block:2, mins:3, control:"teacher", title:"The big fight: how many votes does each state get?",
+     body:"", teach:{say:"Read the two plans aloud, then ask her which she would choose if she lived in a small state, and which in a big one.", ask:"Is either side being unreasonable?", watch:"This is the heart of the lesson. Let her argue both sides before moving on.", time:"About 3 minutes. Take longer here if she is engaged."}},
+    {type:"check", block:2, mins:1, control:"student", id:"c2", title:"Quick check",
+     q:"A small state like New Jersey worried about the Virginia Plan. What was the worry?",
+     a:["Big states could outvote it every time","It would pay too much tax","It would lose its governor","It would have too many seats"], c:0,
+     why:"If votes follow population, big states can always outvote small ones.",
+     teach:{say:"Same as before: wait, then let her answer.", ask:"Can she put the fear in her own words?", watch:"If she answers instantly and correctly, you can speed up the next screen.", time:"About 1 minute"}},
+    {type:"diagram", block:2, mins:3, control:"teacher", portrait:["Roger Sherman","1721 to 1793","Connecticut delegate who proposed the compromise"], title:"The compromise: two houses",
+     body:"", teach:{say:"Tap House then Senate. Have her predict what each does before you reveal.", ask:"Why does giving each side half of what it wanted work?", watch:"Also called the Connecticut Compromise. Follow-up for another day: the Three-Fifths Compromise, which also came from this convention, counted enslaved people as three-fifths of a person for representation and taxes and helped protect slavery. A harder, important conversation. Decide in advance how you will handle it.", time:"About 3 minutes"}},
+    {type:"recall", block:2, mins:2, control:"student", title:"Say it in your own words",
+     prompt:"In your own words: what was the problem, what did each side want, and how did the compromise fix it? Say it out loud or type a few lines, then compare.",
+     model:["Problem: states disagreed about how many votes each should get.","Big states wanted votes by population; small states wanted equal votes.","Compromise: House by population, Senate with two per state."],
+     teach:{say:"Have her say it aloud first, then reveal the model answer and compare.", ask:"What did she leave out? Fill gaps with a question, not a lecture.", watch:"Return to her answer from the first screen. Did her idea of fairness change?", time:"About 2 minutes"}},
+    {type:"quiz", block:4, mins:5, control:"student", title:"Quiz", teach:{say:"Stay quiet during the quiz. Afterward, go over any missed question together.", ask:"For each miss: which screen did it come from?", watch:"Retakes are allowed. Best attempt is the current score. Mastery here means 4 of 5 or better (setting to be decided).", time:"About 5 minutes"}},
+    {type:"done", block:5, mins:2, control:"teacher", title:"Done",
+     teach:{say:"Ask her for three things she remembers, with no screens. Then fill in the notes below.", ask:"What was the best question she asked today?", watch:"Do the reflection now, while it is fresh. It takes about a minute.", time:"About 2 minutes"}}
+  ]
+};
+const blockNames = {1:"Warm-up",2:"Instruction",3:"Guided practice",4:"Quiz",5:"Exit recall"};
+
+// ---------- State (memory only) ----------
+let i = 0, teacher = false, maxReached = 0, pacing = "per", override = false, mapSel = null;
+const exploreLater = [];
+const answers = {};          // check-question answers by id
+const revealed = {};         // revealed facts etc.
+let quizAttempts = [];       // {date, score, results[]}
+let currentQuiz = null;      // in progress
+const reflection = {attention:"",dragged:"",minutes:"",gap:"",change:"",fix:"",open:""};
+
+const $ = s => document.querySelector(s);
+const stage = $("#stage"), side = $("#side"), layout = $("#layout");
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const STATES = [ // [abbr, name, col, row, 1790 pop, rank]
+  ["NH","New Hampshire",4,0,142000,10],["NY","New York",3,1,340000,5],["MA","Massachusetts",4,1,379000,4],
+  ["PA","Pennsylvania",2,2,434000,2],["NJ","New Jersey",3,2,184000,9],["CT","Connecticut",4,2,238000,8],["RI","Rhode Island",5,2,69000,12],
+  ["MD","Maryland",2,3,319000,6],["DE","Delaware",3,3,59000,13],["VA","Virginia",2,4,747000,1],
+  ["NC","North Carolina",2,5,394000,3],["SC","South Carolina",2,6,249000,7],["GA","Georgia",2,7,83000,11]];
+function portrait(name,dates,role){
+  return `<figure class="portrait"><span class="ph">placeholder</span><svg viewBox="0 0 120 150" role="img" aria-label="Portrait placeholder for ${esc(name)}"><rect width="120" height="150" rx="10" fill="var(--bg)" stroke="var(--line)"/><circle cx="60" cy="56" r="26" fill="var(--line)"/><path d="M14 150c0-34 20-54 46-54s46 20 46 54z" fill="var(--line)"/></svg><figcaption><b>${esc(name)}</b><br>${esc(dates)}<br><span class="note">${esc(role)}</span></figcaption></figure>`;
+}
+function tileMap(){
+  const tiles = STATES.map(([a,n,c,r,pop,rank])=>`<button class="tile ${rank<=5?'big':'small'} ${a==='RI'?'none':''} ${mapSel===a?'sel':''}" style="grid-column:${c+1};grid-row:${r+1}" data-tile="${a}" aria-label="${n}">${a}</button>`).join("");
+  let info = `<p class="muted" style="text-align:center">Tap a state.</p>`;
+  if(mapSel){ const x = STATES.find(t=>t[0]===mapSel);
+    info = `<div class="feedback"><b>${x[1]}</b>: about ${x[4].toLocaleString()} people in 1790, ranked ${x[5]} of 13.${mapSel==='RI'?' Rhode Island sent no delegates to the convention.':''}</div>`; }
+  return `<div class="tilemap" role="group" aria-label="Tile map of the 13 states, north at top">${tiles}</div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Five biggest</span><span><i style="background:var(--good)"></i>The other eight</span><span><i style="border:2px dashed var(--muted)"></i>Sent no delegates</span></div>${info}
+    <p class="bgnote">Schematic map, north at top. The real build would use a proper historical map.</p>`;
+}
+function effControl(s){ return pacing==="student"?"student":pacing==="teacher"?"teacher":(s.control||"student"); }
+function gated(s){
+  if(s.type==="check") return !(answers[s.id]&&answers[s.id].submitted);
+  if(s.type==="quiz") return quizAttempts.length===0;
+  return false;
+}
+function best(){ return quizAttempts.length ? Math.max(...quizAttempts.map(a=>a.score)) : null; }
+
+function render(){
+  const s = lesson.screens[i];
+  $("#blockChip").textContent = "Block " + s.block + " of 5 · " + blockNames[s.block];
+  const used = lesson.screens.slice(0,i).reduce((n,x)=>n+x.mins,0);
+  const total = lesson.screens.reduce((n,x)=>n+x.mins,0);
+  $("#timeChip").textContent = "Plan: ~" + used + " of " + total + " min";
+  let html = "";
+  if(s.type==="intro") html = `<h1>${s.title}</h1><div class="body">${s.body}<p class="bgnote">Background image slot: ${esc(s.bg)} (gradient stand-in here).</p></div>`;
+  else if(s.type==="info") html = `<h2>${s.title}</h2><div class="body"><div class="withimg">${portrait(...s.portrait)}<div class="grow">${s.body}</div></div></div>`;
+  else if(s.type==="map") html = `<h2>${s.title}</h2><div class="body">${tileMap()}</div>`;
+  else if(s.type==="facts"){
+    html = `<h2>${s.title}</h2><p>${s.lead}</p><div class="body"><div class="cards">` +
+      s.facts.map((f,k)=>`<button class="fact ${revealed['f'+i+k]?'':'hidden'}" data-fact="${k}"><b>${esc(f[0])}</b><span class="more">${esc(f[1])}</span>${revealed['f'+i+k]?'':'<span class="note">Tap to reveal</span>'}</button>`).join("") + `</div>` + trailHTML(s) + `</div>`;
+  }
+  else if(s.type==="check") html = `<h2>${s.title}</h2><div class="body">${questionHTML(s.id, s.q, s.a, s.c, s.why)}</div>`;
+  else if(s.type==="plans") html = `<h2>${s.title}</h2><div class="body"><div class="two">
+      <div class="plan">${portrait("James Madison","1751 to 1836","Wrote most of the plan")}<h3>Virginia Plan</h3><p class="muted">Big-state idea</p><ul><li>Votes based on population</li><li>More people, more say</li></ul></div>
+      <div class="plan">${portrait("William Paterson","1745 to 1806","Presented the plan")}<h3>New Jersey Plan</h3><p class="muted">Small-state idea</p><ul><li>One vote per state</li><li>Every state equal</li></ul></div></div>
+      <p style="margin-top:16px">Both sound fair. Both cannot win. The convention almost fell apart over this.</p></div>`;
+  else if(s.type==="diagram"){
+    const dots = n => Array.from({length:n},()=>'<span class="seat"></span>').join("");
+    html = `<h2>${s.title}</h2><div class="withimg">${portrait(...s.portrait)}<div class="grow"><p>Tap each house to see what it does.</p></div></div><div class="body"><div class="diagram">
+      <button class="house ${revealed.house?'open':''}" data-house="house"><span class="big">House of Representatives</span><span class="note">Big-state half</span><span class="detail">Seats by <b>population</b>. A state with more people sends more representatives.<div class="seats">${dots(20)}</div></span></button>
+      <button class="house ${revealed.senate?'open':''}" data-house="senate"><span class="big">Senate</span><span class="note">Small-state half</span><span class="detail"><b>Two</b> senators per state, no matter its size.<div class="seats">${Array.from({length:8},()=>'<span class="seat s2"></span>').join("")}</div></span></button></div>
+      <p style="margin-top:14px" class="muted">A law has to pass both houses. Each side gave something up and got something back.</p></div>`;
+  }
+  else if(s.type==="recall"){
+    html = `<h2>${s.title}</h2><p>${s.prompt}</p><div class="body"><textarea id="recallText" aria-label="Your answer">${esc(answers.recall||"")}</textarea>
+      <p><button class="btn secondary" id="showModel">${revealed.model?'Hide model answer':'Show model answer'}</button></p>
+      ${revealed.model?'<div class="feedback"><b>Model answer</b><ul>'+s.model.map(m=>'<li>'+esc(m)+'</li>').join("")+'</ul></div>':''}</div>`;
+  }
+  else if(s.type==="quiz") html = `<h2>Quiz</h2><div class="body">${quizHTML()}</div>`;
+  else if(s.type==="done"){
+    const b = best();
+    html = `<h2>Nice work</h2><div class="body">${b===null?'<p>You have not taken the quiz yet. Go back one screen to take it.</p>':
+      `<p class="score">${b} / ${lesson.quiz.length}</p><p><span class="badge ${b>=4?'m':'p'}">${b>=4?'Mastered':'Keep practicing'}</span> <span class="muted">Completed: yes</span></p>
+      <p class="muted">Completed and mastered are tracked separately, so a low score never makes finished work look undone.</p>
+      <table><tr><th>Attempt</th><th>Date</th><th>Score</th></tr>${quizAttempts.map((a,k)=>`<tr><td>${k+1}</td><td>${a.date}</td><td>${a.score} / ${lesson.quiz.length}${a.score===b?' (best)':''}</td></tr>`).join("")}</table>`}
+      ${exploreLater.length?'<p><b>Saved to explore later:</b> '+exploreLater.map(esc).join(', ')+'</p>':''}
+      <p style="margin-top:16px">Last step: say three things you remember, with no screens.</p></div>`;
+  }
+  const dots = lesson.screens.map((_,k)=>`<button class="dot ${k<i?'done':''} ${k===i?'now':''}" data-go="${k}" aria-label="Screen ${k+1}" ${k>maxReached?'disabled':''}></button>`).join("");
+  const ec = effControl(s), g = gated(s), last = i===lesson.screens.length-1;
+  const studentCan = ec==="student";
+  let nextLabel = "Next", nextOff = last || !studentCan || g;
+  if(!last && !studentCan) nextLabel = "Waiting for teacher";
+  else if(!last && g) nextLabel = s.type==="quiz" ? "Finish the quiz to continue" : "Answer to continue";
+  stage.classList.toggle("hasbg", s.type==="intro");
+  stage.style.setProperty("--bgimg","linear-gradient(135deg,#c9b99a,#7f9db9 55%,#3b5b7a)");
+  stage.innerHTML = `<div class="ctl">${ec==="teacher"?"<b>Teacher leads</b> this screen":"<b>Your turn</b>: you move on when you are ready"}</div>` + html +
+    `<div class="nav"><button class="btn secondary" id="prev" ${i===0||!studentCan?'disabled':''}>Back</button><div class="spacer dots">${dots}</div><button class="btn" id="next" ${nextOff?'disabled':''}>${nextLabel}</button></div>`;
+  bind();
+  renderSide();
+}
+
+function questionHTML(id,q,a,c,why){
+  const st = answers[id];
+  const done = st && st.submitted;
+  return `<p class="big">${esc(q)}</p><div class="opts">` + a.map((t,k)=>{
+    let cls = "opt";
+    if(done){ if(k===c) cls+=" right"; else if(k===st.pick) cls+=" wrong"; }
+    else if(st && st.pick===k) cls+=" sel";
+    return `<button class="${cls}" data-pick="${id}:${k}" ${done?'disabled':''}>${esc(t)}</button>`;
+  }).join("") + `</div>` + (done? `<div class="feedback ${st.pick===c?'good':'bad'}"><b>${st.pick===c?'Correct.':'Not quite.'}</b> ${esc(why)}</div>` :
+    `<button class="btn" data-submit="${id}" ${st&&st.pick!==undefined?'':'disabled'}>Check answer</button>`);
+}
+
+function quizHTML(){
+  if(!currentQuiz){
+    const b = best();
+    return `<p class="big">${lesson.quiz.length} questions. The answer shows after each one. You can retake it, and your best score is the one that counts.</p>
+      ${b!==null?`<p>Best so far: <b>${b} / ${lesson.quiz.length}</b></p>`:''}
+      <button class="btn" id="startQuiz">${quizAttempts.length?'Retake quiz':'Start quiz'}</button>`;
+  }
+  const n = currentQuiz.n;
+  if(n>=lesson.quiz.length){
+    const score = currentQuiz.results.filter(Boolean).length;
+    return `<p class="score">${score} / ${lesson.quiz.length}</p><p><span class="badge ${score>=4?'m':'p'}">${score>=4?'Mastered':'Not yet mastered'}</span></p>
+      <p class="muted">Best of all attempts: ${Math.max(score,best()||0)} / ${lesson.quiz.length}</p>
+      <button class="btn secondary" id="retake">Retake</button> <button class="btn" id="finishQuiz">Finish</button>`;
+  }
+  const Q = lesson.quiz[n];
+  const st = currentQuiz.cur;
+  const done = st && st.submitted;
+  return `<p class="note">Question ${n+1} of ${lesson.quiz.length}</p><p class="big">${esc(Q.q)}</p><div class="opts">` + Q.a.map((t,k)=>{
+    let cls="opt";
+    if(done){ if(k===Q.c) cls+=" right"; else if(k===st.pick) cls+=" wrong"; }
+    else if(st && st.pick===k) cls+=" sel";
+    return `<button class="${cls}" data-qpick="${k}" ${done?'disabled':''}>${esc(t)}</button>`;
+  }).join("") + `</div>` + (done?
+    `<div class="feedback ${st.pick===Q.c?'good':'bad'}"><b>${st.pick===Q.c?'Correct.':'Not quite.'}</b> ${esc(Q.why)}</div><p><button class="btn" id="nextQ">${n+1<lesson.quiz.length?'Next question':'See score'}</button></p>`:
+    `<button class="btn" id="qsubmit" ${st&&st.pick!==undefined?'':'disabled'}>Submit</button>`);
+}
+
+function bind(){
+  const s = lesson.screens[i];
+  $("#prev").onclick = ()=>go(i-1);
+  $("#next").onclick = ()=>go(i+1);
+  stage.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(+b.dataset.go));
+  stage.querySelectorAll("[data-tile]").forEach(b=>b.onclick=()=>{mapSel=b.dataset.tile;render();});
+  const ot=$("#openTrail"); if(ot) ot.onclick=()=>{revealed.trail=!revealed.trail;render();};
+  const st=$("#saveTrail"); if(st) st.onclick=()=>{const t=lesson.screens[i].trail.title; if(!exploreLater.includes(t)) exploreLater.push(t); render();};
+  stage.querySelectorAll("[data-fact]").forEach(b=>b.onclick=()=>{revealed['f'+i+b.dataset.fact]=true;render();});
+  stage.querySelectorAll("[data-house]").forEach(b=>b.onclick=()=>{revealed[b.dataset.house]=!revealed[b.dataset.house];render();});
+  stage.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>{const [id,k]=b.dataset.pick.split(":");answers[id]={pick:+k};render();});
+  stage.querySelectorAll("[data-submit]").forEach(b=>b.onclick=()=>{answers[b.dataset.submit].submitted=true;render();});
+  const rt = $("#recallText"); if(rt) rt.oninput = ()=>{answers.recall=rt.value;};
+  const sm = $("#showModel"); if(sm) sm.onclick=()=>{revealed.model=!revealed.model;render();};
+  const sq=$("#startQuiz"); if(sq) sq.onclick=()=>{currentQuiz={n:0,results:[],cur:null};render();};
+  const rq=$("#retake"); if(rq) rq.onclick=()=>{recordAttempt();currentQuiz={n:0,results:[],cur:null};render();};
+  stage.querySelectorAll("[data-qpick]").forEach(b=>b.onclick=()=>{currentQuiz.cur={pick:+b.dataset.qpick};render();});
+  const qs=$("#qsubmit"); if(qs) qs.onclick=()=>{const Q=lesson.quiz[currentQuiz.n];currentQuiz.cur.submitted=true;currentQuiz.results.push(currentQuiz.cur.pick===Q.c);render();};
+  const nq=$("#nextQ"); if(nq) nq.onclick=()=>{currentQuiz.n++;currentQuiz.cur=null;render();};
+  const fq=$("#finishQuiz"); if(fq) fq.onclick=()=>{recordAttempt();currentQuiz=null;go(i+1);};
+}
+function recordAttempt(){
+  if(!currentQuiz) return;
+  const score = currentQuiz.results.filter(Boolean).length;
+  quizAttempts.push({date:new Date().toLocaleDateString(), score});
+}
+function go(k){
+  if(k<0||k>=lesson.screens.length) return;
+  if(k>i && gated(lesson.screens[i]) && !override) return;
+  if(k>maxReached+1 && !override) return;
+  i=k; maxReached=Math.max(maxReached,i); render(); window.scrollTo(0,0);
+}
+function trailHTML(s){
+  if(!s.trail) return "";
+  const t=s.trail, saved=exploreLater.includes(t.title);
+  return `<div class="trail"><button class="btn secondary" id="openTrail">${revealed.trail?'Hide':'Open'} ${esc(t.title)} <span class="tag">${esc(t.tag)}</span></button>` +
+    (revealed.trail?`<p style="margin-top:10px">${esc(t.body)}</p><div class="vid">${esc(t.vid)}</div><button class="btn" id="saveTrail" ${saved?'disabled':''}>${saved?'Saved to explore later':'Save for later'}</button>`:'') + `</div>`;
+}
+
+function renderSide(){
+  side.hidden = !teacher; layout.classList.toggle("teacher", teacher);
+  if(!teacher) return;
+  const s = lesson.screens[i], t = s.teach;
+  const g = gated(s);
+  let h = `<h3>Teacher notes · screen ${i+1} of ${lesson.screens.length}</h3>
+    <div class="tnav"><button class="btn secondary" id="tprev" ${i===0?'disabled':''}>Back</button><button class="btn" id="tnext" ${(i===lesson.screens.length-1||(g&&!override))?'disabled':''}>${g&&!override?'Waiting on answer':'Next'}</button>${g?`<button class="btn secondary" id="tover">${override?'Gate: overridden':'Override gate'}</button>`:''}</div>
+    <p class="note">Who moves forward: <b>${effControl(s)==="teacher"?"you":"the student"}</b> on this screen.</p>
+    <div class="pace" role="group" aria-label="Pacing mode"><button data-pace="per" aria-pressed="${pacing==='per'}">Per screen</button><button data-pace="teacher" aria-pressed="${pacing==='teacher'}">I drive all</button><button data-pace="student" aria-pressed="${pacing==='student'}">Student drives all</button></div>
+    <p><b>Time:</b> ${esc(t.time)}</p>
+    <h4>Say</h4><p>${esc(t.say)}</p>
+    <h4>Ask</h4><p>${esc(t.ask)}</p>
+    <h4>Watch for</h4><p>${esc(t.watch)}</p>`;
+  if(s.type==="check"||s.type==="quiz"){
+    const q = s.type==="check" ? `Answer: ${s.a[s.c]}` : "Answers: " + lesson.quiz.map((x,k)=>`${k+1}) ${x.a[x.c]}`).join("; ");
+    h += `<h4>Answer key</h4><p>${esc(q)}</p>`;
+  }
+  if(s.type==="done"){
+    h += `<h4>After-session notes</h4><p class="note">Short, specific, and compiled later to improve lessons. Nothing here is shown to the student.</p>
+      <label for="r1">Did attention hold? (1 = no, 5 = yes)</label><select id="r1">${["","1","2","3","4","5"].map(v=>`<option ${reflection.attention===v?'selected':''}>${v}</option>`).join("")}</select>
+      <label for="r2">Which block dragged?</label><select id="r2">${["","None",...Object.values(blockNames)].map(v=>`<option ${reflection.dragged===v?'selected':''}>${v}</option>`).join("")}</select>
+      <label for="r3">Minutes actually used</label><input type="number" id="r3" min="0" value="${esc(reflection.minutes)}">
+      <label for="r4">Quiz result vs. warm-up recall: any gap?</label><textarea id="r4">${esc(reflection.gap)}</textarea>
+      <label for="r5">Screens to fix (numbers or titles)</label><input type="text" id="r5" value="${esc(reflection.fix)}">
+      <label for="r6">What would you change next time?</label><textarea id="r6">${esc(reflection.change)}</textarea>
+      <label for="r7">Questions she asked / topics to revisit</label><textarea id="r7">${esc(reflection.open)}</textarea>
+      <p style="margin-top:12px"><button class="btn" id="copyNotes">Show notes as text</button></p><pre id="notesOut" hidden></pre>`;
+  }
+  side.innerHTML = h;
+  const tp=$("#tprev"); if(tp) tp.onclick=()=>go(i-1);
+  const tn=$("#tnext"); if(tn) tn.onclick=()=>go(i+1);
+  const to=$("#tover"); if(to) to.onclick=()=>{override=!override;render();};
+  side.querySelectorAll("[data-pace]").forEach(b=>b.onclick=()=>{pacing=b.dataset.pace;render();});
+  const map = {r1:"attention",r2:"dragged",r3:"minutes",r4:"gap",r5:"fix",r6:"change",r7:"open"};
+  Object.entries(map).forEach(([id,key])=>{const el=$("#"+id); if(el) el.oninput=el.onchange=()=>{reflection[key]=el.value;};});
+  const cn=$("#copyNotes"); if(cn) cn.onclick=()=>{
+    const out=$("#notesOut");
+    out.textContent = `Lesson: ${lesson.title}\nDate: ${new Date().toLocaleDateString()}\nAttention (1-5): ${reflection.attention}\nBlock that dragged: ${reflection.dragged}\nMinutes used: ${reflection.minutes}\nQuiz vs warm-up gap: ${reflection.gap}\nScreens to fix: ${reflection.fix}\nChange next time: ${reflection.change}\nQuestions / revisit: ${reflection.open}\nQuiz attempts: ${quizAttempts.map(a=>a.score+"/"+lesson.quiz.length).join(", ")||"none"}\nExplore later: ${exploreLater.join(", ")||"none"}`;
+    out.hidden=false;
+  };
+}
+
+$("#viewToggle").onclick = ()=>{
+  teacher=!teacher;
+  const b=$("#viewToggle"); b.setAttribute("aria-pressed",teacher); b.textContent="Teacher view: "+(teacher?"on":"off");
+  renderSide();
+};
+document.addEventListener("keydown",e=>{
+  if(["TEXTAREA","INPUT","SELECT"].includes(e.target.tagName)) return;
+  if(e.key==="ArrowRight") go(i+1);
+  if(e.key==="ArrowLeft") go(i-1);
+});
+render();
+</script>
+</body>
+</html>

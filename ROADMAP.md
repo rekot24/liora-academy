@@ -1,7 +1,7 @@
 # ROADMAP
 
 The path for Liora's Academy. **SPEC.md** is the specifics of the current milestone, **CLAUDE.md** is how to work and where things are.
-Plan changes happen in chat first, then land here. Last updated: 2026-10-18.
+Plan changes happen in chat first, then land here. Last updated: 2026-10-20.
 
 **Goal:** an interactive, AI-assisted classical education plus everyday skills a traditional school skips, for Liora (grade 7) and Amari (grade 8, joins in January 2027). Colorado requirements are the floor, not the goal.
 
@@ -66,7 +66,7 @@ Vite + TypeScript app, design tokens, shared components, settings store, student
 Done when: the new app shows Liora's and Amari's real data next to the old portal.
 
 **R2: Instruction player and quizzes (target: Sun Jan 17)**
-Migration 003 (instruction content on assignments, quiz attempts, mastery, resume position), API endpoints, the player, and automatic quiz scoring tied to the existing grades.
+Start with the storage design in `docs/design/lesson-structure.md` (draft v1: courses, instruction content copied onto assignments, progress, attempts and responses as history, a stable assignment id, re-teach as a new assignment). Then migration 003, API endpoints, the player, and automatic quiz scoring tied to the existing grades.
 Done when: one real instruction runs end to end for both students and its score shows on the dashboard.
 
 **R3: Reading countdown timer (target: Sun Jan 31)**
@@ -85,7 +85,7 @@ Done when: the old front end is retired and every checklist item is ticked.
 
 These matter more to the goal than any milestone above. They need dates because nothing else forces them.
 
-- [ ] C1 Session playbook: the lecture-then-AI-questions format, class blocks of 15 to 35 minutes, Wed to Fri, how the AI is used with the girls (target: Oct 31). Also produces the first draft of the instruction format (screen types, quiz rules) that R2 builds. Research: `docs/research/learning-science.md`.
+- [ ] C1 Session playbook: the lecture-then-AI-questions format, class blocks of 15 to 35 minutes, Wed to Fri, how the AI is used with the girls (target: Oct 31). Also produces the first draft of the instruction format (screen types, quiz rules) that R2 builds. Research: `docs/research/learning-science.md`. Progress 2026-10-20: session model v0 (five blocks, about 30 minutes, plus or minus 15) and a clickable mockup (`docs/mockups/instruction-mockup.html`) are drafted and reviewed once. Still to do: write the playbook itself and try it on one real lesson.
 - [ ] C2 One shared grade 6 to 8 arc: subject list and a Colorado requirements checklist, confirmed with CHEC (target: Nov 15)
 - [ ] C3 Spring 2027: the first four weeks of lessons only, not the whole semester (target: Dec 15)
 - [ ] C4 Field-trip and real-world experience list, weighted over classroom time (target: Dec 15)
@@ -119,6 +119,7 @@ Found in the 2026-10-04 review. Move into a milestone when they block something.
 - [ ] Root clutter: the untouched Vite template README
 - [x] 2026-10-18 The laptop clone at D:\coding\liora-academy is synced to `main`. Old draft copies of ROADMAP, SPEC and CLAUDE are in D:\coding\liora-academy-backup and can be deleted.
 - [ ] **"Today" is computed in UTC, not local time.** `today()` in `src/App.jsx` (and several other `toISOString().split("T")[0]` date keys) use the UTC date, so after about 6 PM Mountain (5 PM in winter) the portal shows tomorrow's lessons. The server timezone does not affect this; it runs in the browser. Fix: one shared local-date helper used everywhere. Small single-file change; do it right after M1, on its own branch. The rebuild's household timezone setting is the long-term fix, but January teaching runs on the current portal, so the small fix is still worth doing.
+- [ ] **Teacher-only data is not secret.** Teacher notes and quiz answer keys will travel in the lesson content and are hidden only by role, so a student could read them in browser dev tools. Fine for one family. Before any other household uses the portal: per-person logins, then the server must never send teacher fields or answer keys to student sessions. Details: `docs/design/lesson-structure.md`, section 9.
 - [ ] Login screen shows the default PIN hint (`App.jsx`, "Default PIN: 9999"). Low risk (soft lock), will be gone with the rebuild (R1).
 - [ ] After a deploy, a browser can keep serving the cached old front end until a hard refresh (found during M1 verification). Likely fix: a short no-cache header for `index.html` in Nginx (hashed assets can stay cached). Do not change Nginx without its own SPEC.
 - [ ] Monthly review of project instructions and dev-standards (next: Nov 4)
@@ -127,6 +128,7 @@ Found in the 2026-10-04 review. Move into a milestone when they block something.
 
 Newest first. One line per finished milestone: date, what shipped, decisions worth keeping.
 
+- 2026-10-20 Planning, no milestone shipped. Lesson storage design drafted (`docs/design/lesson-structure.md`). Decisions: rescheduling only changes a date; courses can be assigned whole or lesson by lesson; re-teaching is a new assignment with fresh work and optional carry-over of notes; teacher-only data hidden by role only until per-person logins (recorded as an issue).
 - 2026-10-18 Planning, no milestone shipped. Scope set: a full learning portal with an instruction layer (screens, quizzes, mastery, reading countdown), rebuilt in Vite + TypeScript in parallel with the current portal. The Rebuild track (R0 to R5) replaces M4 and M5; the decisions are listed under it. Research notes started in `docs/research/learning-science.md`.
 - 2026-10-05 M1 Cutover shipped: the portal reads and writes through the API, the deletion bug no longer reproduces (all six live checks passed), and `main` holds `db/`, `api/` and the new front end. Decisions: merged with a merge commit so `git revert -m 1 <merge>` undoes the cutover in one step; the deploy copies with `cp -r dist/.` instead of `rm -rf` then copy, so the site is never empty; rollback is git revert, push, redeploy (release folders and symlinks decided against on 2026-10-04); db and api tests use in-memory PGlite and never touch the live database. Also removed `db/bin/`, `claude-code-prompt.md` and `VITE_API_KEY` from the build.
 - 2026-10-04 ROADMAP.md created; M1 specified.

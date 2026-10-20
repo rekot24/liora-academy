@@ -52,6 +52,7 @@ Liora's Academy: a React/Vite portal at school.theflairhub.com for Liora (12, gr
 | No settings store, feature flags, logger or error boundary in the front end | Same | ROADMAP Rebuild track (R1) |
 | No `app_logs` table | Not needed yet | Revisit with R1 |
 | Student PINs are client-side soft locks | Family tool behind Cloudflare Access | Per-person logins (Later) |
+| Teacher notes and quiz answer keys (planned, R2) are sent inside lesson content and hidden by role only | One household, no per-person logins yet | Per-person logins, then server-side stripping of teacher fields. Required before any other household uses the portal |
 
 ## Where facts live
 
