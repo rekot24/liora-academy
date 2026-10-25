@@ -93,9 +93,9 @@ New columns on `schedule_items`: `lesson_version_id`, `override jsonb` (nullable
 
 ### Two ways to assign a course (your answer to question 2)
 
-- **Whole course:** a new table `course_assignments` (student, course, optional release, start date, status). The API generates the day-by-day assignments for every lesson in order, using the student's weekly pattern for that subject (`enrollment_pattern`, which already exists). Each assignment pins the then-current published version.
+- **Whole course:** a new table `course_enrollments` (student, course, optional release, sections chosen, start date, status). The API generates the day-by-day assignments for every lesson in order, using the student's weekly pattern for that subject (`enrollment_pattern`, which already exists). Each assignment pins the then-current published version.
 - **Lesson by lesson:** as today, one assignment at a time.
-- Both create the same assignment rows. (Named `course_assignments` so it is not confused with the existing `enrollments`, which are student by semester.)
+- Both create the same assignment rows. (Named `course_enrollments` so it is not confused with the existing `enrollments`, which are student by semester and shown in the interface as "Term". See `schedule-and-catalog-ux.md`.)
 
 ### Re-teaching (your answer to question 5)
 
@@ -183,7 +183,7 @@ The settings store itself arrives in R1. Until then these are constants in one f
 Split the old "migration 003" into three smaller ones, each backed up first and each with a written rollback.
 
 1. **003: assignment identity.** Riskiest, because it changes keys on live tables the current portal uses. Add `id` to the schedule tables and backfill; add `assignment_id` to `completions` and `grades` and backfill by matching (student, date, lesson); then switch primary keys. **Before writing it:** query the live data for ambiguity (the same lesson scheduled twice on one day) and read the API and `syncClient.js` so the old portal keeps working throughout. The API keeps accepting the old shape and maps it to ids on the server, so the current portal is untouched. Own SPEC. Not needed for the playbook trial.
-2. **004: catalog structure.** Courses, sections, lesson columns, `lesson_versions`, `catalog_history`, themes, assets, `course_assignments`. Additive only.
+2. **004: catalog structure.** Courses, sections, lesson columns, `lesson_versions`, `catalog_history`, themes, assets, `course_enrollments`. Additive only.
 3. **005: work tables.** `assignment_progress`, `lesson_runs`, `quiz_attempts`, `responses`, `screen_views`, `session_notes`. Additive only.
 
 004 and 005 add only new tables and columns, so rollback is simply not using them. 003 needs a tested rollback script.
@@ -207,7 +207,7 @@ Split the old "migration 003" into three smaller ones, each backed up first and 
 
 ## 15. Open questions
 
-1. **What does an assignment point at?** My reading: a day-sized **lesson** (about one 30-minute session) is what gets scheduled, so today's catalog "lessons" map to new lessons and sections are new. You described sections as "formerly lessons"; if sections were meant to be the scheduled unit, say so, because it changes the migration.
+1. ~~What does an assignment point at?~~ **Resolved 2026-10-21:** only a lesson is scheduled onto a day. Today's catalog lessons map to new lessons; sections are new.
 2. How do the existing Khan lessons and imported sheets map into courses and sections? Proposal: one course per subject-level set, one section per unit, the existing rows as lessons with empty content.
 3. Does a section have its own content, such as an intro or a section exam? Not in v1; the model allows adding a lesson of type "section quiz".
 4. Subject and course: a course belongs to one subject. Is that right?
