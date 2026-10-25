@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { queueWrite, fetchServerState, onSyncStatusChange, isBusy, forgetEtag, restorePending, restoreToServer } from "./lib/syncClient.js";
 import { SYNC_POLL_MS as SERVER_POLL_MS } from "./constants/index.js";
+import { localDateKey, dateFromKey } from "./lib/dates.js";
 
 // ─── INITIAL DATA ────────────────────────────────────────────────────────────
 
@@ -339,7 +340,7 @@ function ensureIds(list) {
 }
 
 function today() {
-  return new Date().toISOString().split("T")[0];
+  return localDateKey();
 }
 
 function formatDate(dateStr) {
@@ -451,7 +452,7 @@ function generateSchedule(semester, assignments, pattern, overrides = {}, existi
   while (current <= end) {
     iterations++;
     if (iterations > MAX_ITERATIONS) { hitSafetyCap = true; break; }
-    const dateKey = current.toISOString().split("T")[0];
+    const dateKey = localDateKey(current);
 
     if (overrides[dateKey] !== undefined) {
       // Manual override wins outright — "SKIP" means an intentionally empty day
@@ -719,10 +720,10 @@ function DailyDashboard({ schedule, log, onToggle, semester, allLog, skills, ski
 
   // Streak
   let streak = 0;
-  let checkDate = new Date(todayKey);
+  let checkDate = dateFromKey(todayKey);
   checkDate.setDate(checkDate.getDate() - 1);
   while (true) {
-    const dk = checkDate.toISOString().split("T")[0];
+    const dk = localDateKey(checkDate);
     const sched = schedule[dk] || [];
     if (sched.length === 0) { checkDate.setDate(checkDate.getDate() - 1); continue; }
     if (sched.every(a => allLog[dk]?.[a.id])) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
@@ -890,7 +891,7 @@ function WeeklyRoundup({ schedule, allLog, fieldTrips, skills, skillsCatalog }) 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(startOfWeek);
     d.setDate(startOfWeek.getDate() + i);
-    return d.toISOString().split("T")[0];
+    return localDateKey(d);
   });
 
   const weekAssignments = weekDays.flatMap(d => (schedule[d] || []).map(a => ({ ...a, date: d })));
@@ -1322,7 +1323,7 @@ function ScheduleCalendar({ schedule, overrides, onDayClick, allLog }) {
     else d.setDate(d.getDate() + dir);
     setAnchor(d);
   }
-  function dateKeyOf(d) { return d.toISOString().split("T")[0]; }
+  function dateKeyOf(d) { return localDateKey(d); }
   function itemsFor(dateKey) { return schedule[dateKey] || []; }
 
   // Returns completion state for a past day: "all" | "partial" | "missed" | null (future/no items)
@@ -2246,7 +2247,7 @@ function AttendanceTab({ schedule, allLog, fieldTrips, activeSemester, grades })
             {DOW_LETTER.map((d, i) => <div key={i} style={{ textAlign: "center", fontSize: 10, color: "#475569" }}>{d}</div>)}
             {[...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)].map((day, i) => {
               if (!day) return <div key={i} />;
-              const dk = new Date(y, m, day).toISOString().split("T")[0];
+              const dk = localDateKey(new Date(y, m, day));
               const attended = attendedDates.includes(dk);
               const hasTrip = fieldTrips.some(t => t.date === dk);
               const isToday = dk === todayKey;
