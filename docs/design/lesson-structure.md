@@ -1,175 +1,214 @@
-# Lesson structure and storage (draft v0)
+# Course, section and lesson structure and storage (draft v2)
 
-Status: DRAFT v1, 2026-10-20 (decisions in section 9 recorded). Nothing here is built. Supports ROADMAP Rebuild track R2 (instruction player and quizzes, migration 003). Public repo: keep it general, no personal details about the children.
+Status: DRAFT v2, 2026-10-21. Replaces v1 (2026-10-20). Nothing here is built. Supports ROADMAP Rebuild track R2. Public repo: keep it general, no personal details about the children.
 
-Working names: **course** (a group of lessons), **lesson** (the existing planning unit), **instruction** (the screens under a lesson; name not settled).
+## 0. What changed from v1
 
-## 1. What this has to do
+- **New words.** Course, section, lesson. "Instruction" is retired. See section 1.
+- **Copy versus reference reversed.** v1 copied the whole lesson onto each assignment. With immutable versions (your request) it is better to **point at an exact version** and store only the student's work and any small per-student edits. Same protection for history, no duplicated content. See section 5.
+- **Versioning scheme changed.** Versions are per item and immutable, not a nested dotted number. See section 4.
+- **Assignment identity.** The schedule row gets its own id as primary key, and completions and grades hang off it. See section 5.
+- **New rules:** attempt limit using runs, screen gates, read-aloud, themes. Sections 7 to 9.
 
-- A lesson is authored once, then **copied to each student when assigned**. The copy can be edited for that student without touching the original, and can hold what the student did.
-- What the student did (answers, quiz attempts, position, notes) is **history**. It must survive edits to the catalog, rescheduling, and a failed quiz must never make finished work look undone.
-- Three authoring paths (AI-drafted, hand-written file, in-app editor) all produce **one shared format**, checked by one validator.
-- Fits what already exists (migration 001): `lessons` catalog, `schedule_items.snapshot` copy, `customized_fields`, `completions`, `grades`. We extend it; we do not replace it.
+## 1. Words and rules
 
-## 2. The picture: three layers
+| Word | Meaning |
+|---|---|
+| **Course** | Top level, for example "US History". Belongs to a subject. |
+| **Section** | A unit of the course. A course has many sections; a section belongs to exactly one course. |
+| **Lesson** | One teaching session: the screens, checks, teacher notes and quiz. A section has many lessons; a lesson belongs to exactly one section. |
+
+- To reuse a lesson in another course, **fork** it (a copy with its own history), never share one row.
+- "Instruction" is retired. The DB table `lessons` stays and becomes the new lesson (see open question 1 about what the old planning lessons map to).
+- Plain lessons with no screens (a Khan Academy link, a reading) are lessons with empty content, so the catalog you have today keeps working.
+
+## 2. What this has to do
+
+- Author once. Assign to a student without losing the original or other students' copies.
+- Keep **every version** of a lesson so we always know exactly what a student saw.
+- Student work (answers, attempts, notes, position, time spent) is history and survives edits, version changes and rescheduling.
+- Done and mastered stay separate. A failed quiz never makes finished work look undone.
+- Three authoring paths (AI-drafted, hand-written, in-app editor), one format, one validator.
+
+## 3. The picture
 
 ```
-CATALOG (household level, authored once)
-  course  ->  lessons  ->  instruction content (screens, quiz, teacher notes)
-                |
-                |  assign (copy)            <- the rule that already exists
-                v
-ASSIGNMENT (one per student, per lesson, per scheduled day)
-  schedule_items row: its own copy of the content + customized_fields
-                |
-                |  student works through it
-                v
-WORK (history, append-only where possible)
-  progress (where she is, done, mastered)
-  attempts + responses (every quiz try, every answer)
-  notes (her recall text, teacher after-session notes)
-  grades row (official score = best attempt)
+CATALOG (household level; items are immutable once published)
+  subject -> course -> section -> lesson -> lesson_versions (v1, v2, v3 ...)
+                                              |
+                                              |  assign: pin one exact version
+                                              v
+ASSIGNMENT (one per student, per scheduled lesson; has its own id)
+  points at lesson_version, plus optional small per-student edits
+                                              |
+                                              |  student works through it
+                                              v
+WORK (append-only history)
+  runs (each pass through the lesson) -> quiz attempts, responses
+  screen views (time spent), notes, progress, grade (best attempt)
 ```
 
-Rule of thumb: **the content you assigned is one thing; what the student did with it is another.** They live in different tables so editing one never rewrites the other.
+## 4. Versioning
 
-## 3. Catalog changes
+**Rule:** every lesson has immutable versions numbered 1, 2, 3 by their own counter. Editing a published lesson never changes it in place. It creates a new draft version; publishing makes it the current one. Old versions stay forever.
 
-**courses** (new): `id, household_id, subject_id, title, description, cover_asset_id, position, status (draft | published), archived_at, meta`
+Why not a nested number like 1.1.3 (course.section.lesson):
 
-**lessons** (existing, add columns):
+- Editing one lesson would have to bump its section and its course too, so numbers would climb on every edit and mean little.
+- Reordering or splitting sections would force renumbering the children, which breaks the "this is exactly what she saw" record.
+- The three digits mix "where it sits" with "which edit it is". Position belongs to the structure; the version belongs to the content.
 
-| Column | Meaning |
+So:
+
+| Level | How it is versioned |
 |---|---|
-| `course_id` (nullable) | which course it belongs to; null = a stand-alone lesson, so today's catalog keeps working |
-| `unit` (text, nullable) | a unit label inside the course; a real units table can come later |
-| `instruction` (jsonb, nullable) | the screens, in the format in section 4. Null = a plain lesson with just text, like today |
-| `instruction_version` (int) | goes up by one on each edit, so we can tell which version a student got |
-| `status` | `draft` or `published`; only published lessons can be scheduled |
+| **Lesson** | Full immutable versions (`lesson_versions`). This is where the content and the history that matters live. |
+| **Section and course** | Living records (title, description, order, theme). Every change is written to an append-only `catalog_history` (who, when, before, after), so nothing is lost. |
+| **Course release (optional, later)** | A named freeze: a manifest listing each lesson and its pinned version in order ("US History, Spring 2027 edition"). Lets you assign "the course as of release 2". Costs nothing until you use it. |
 
-Courses and units are only grouping. Scheduling still works lesson by lesson, so "assign this course to a student" is a bulk insert of schedule rows, using the same copy path as today.
+A dotted label such as **1.1.3** can still be shown on screen. Derive it for display from `course release . section position . lesson version`; it is not stored, so we can change the format later without touching data.
 
-## 4. Instruction content format (JSON, `schemaVersion: 1`)
+**`lesson_versions`:** `id, lesson_id, version, status (draft | published), content jsonb, content_hash, change_note, created_at, created_by`. Unique on (lesson_id, version). A hash of the content stops identical versions being saved twice. Published rows are never updated (a database rule or trigger enforces it).
 
-One lesson's content is one JSON document:
+## 5. Assignments: reference, not copy
 
-```json
-{
-  "schemaVersion": 1,
-  "mastery": { "threshold": 0.8 },
-  "screens": [
-    { "id": "s-intro", "type": "intro", "mins": 1, "control": "teacher",
-      "title": "How do you build a fair government?",
-      "body": "Imagine 13 groups ...",
-      "image": { "asset": "a_9f2c", "use": "background", "alt": "Independence Hall" },
-      "teacher": { "say": "...", "ask": "...", "watch": "...", "time": "About 1 minute" } },
+**Your question: copy the course for each student, or tie a table of grades and notes to the student?** The second, with one change: tie it to the **assignment**, not to the course.
 
-    { "id": "s-check1", "type": "check", "mins": 1, "control": "student",
-      "question": { "id": "q-articles-tax",
-        "text": "Why was it a problem that Congress could not raise money?",
-        "choices": ["It could not pay soldiers or debts", "..."], "correct": 0,
-        "explain": "A government that cannot pay its bills ..." } },
+- The assignment **points at one exact lesson version.** Because versions never change, pointing at one gives the same protection as a copy, with no duplicated content.
+- The student's **work** (answers, attempts, notes, position) lives in its own tables and references the assignment.
+- **Per-student edits** (rare) are stored as a small patch on the assignment, keyed by screen id, and applied when the lesson is shown. We copy only when something is actually edited, not for every assignment.
+- **Updating to a newer version** is allowed only if no work has started. The teacher can choose "update to latest" for an unstarted assignment. Started work stays pinned.
 
-    { "id": "s-trail", "type": "facts", "title": "...",
-      "sideTrail": { "title": "Shays' Rebellion", "body": "...", "video": { "url": "..." } } }
-  ],
-  "quiz": [ { "id": "q-1", "text": "...", "choices": ["..."], "correct": 1, "explain": "..." } ]
-}
-```
+### Assignment identity (your answer to question 1)
 
-Rules for the format:
+Yes: **`assignment_id` is the new primary key.** The schedule row currently uses (student, date, position), which is why moving a day would break links. Change it:
 
-- **Stable ids.** Every screen and every question has an id that never changes once created. Answers are stored against the question id, so we can edit wording without orphaning history.
-- **Screen types are a fixed list**, one React component each: `intro`, `info`, `facts` (tap to reveal), `check`, `map`, `compare` (two columns), `diagram`, `recall` (free text with model answer), `video`, `reading` (countdown timer, R3), `quiz`. New type = new component plus an entry in the type list. Unknown types render as a safe fallback.
-- **Teacher notes and answer keys live in the same JSON** under `teacher`. The API only sends them to a teacher request. Today there are no per-person logins (known deviation: PIN soft locks), so this is a soft wall; a child could read it in browser dev tools. Acceptable for now, listed as a known limit.
-- **Images and video by reference.** Images are `assets` (a small table plus files on the server, not in the public repo), referenced by asset id, never embedded. Video is a URL embed. Assets are immutable, so a copied lesson can point at the same asset safely.
-- **Validated on every write.** One schema (TypeScript types plus Zod, shared by web and API in the rebuild) checks content before it is saved. The database only sees valid JSON.
+- `schedule_items.id` (uuid) becomes the primary key. `date` and `position` become ordinary columns, indexed.
+- **Moving a lesson to another day changes only the date.** Nothing is deleted or re-created.
+- `completions` and `grades` currently key on (student, date, lesson). They must reference the assignment id too, or moving a lesson would leave its completion behind. The date stays as "done on".
+- Same change for `schedule_override_items`.
+- This is a change to a live table that the current portal and API use. See section 10 for how to do it safely.
 
-## 5. Assignment changes (`schedule_items`, and `schedule_override_items`)
+New columns on `schedule_items`: `lesson_version_id`, `override jsonb` (nullable), `previous_assignment_id` (nullable, for re-teach), `course_assignment_id` (nullable, see below).
 
-Add:
+### Two ways to assign a course (your answer to question 2)
 
-| Column | Meaning |
+- **Whole course:** a new table `course_enrollments` (student, course, optional release, sections chosen, start date, status). The API generates the day-by-day assignments for every lesson in order, using the student's weekly pattern for that subject (`enrollment_pattern`, which already exists). Each assignment pins the then-current published version.
+- **Lesson by lesson:** as today, one assignment at a time.
+- Both create the same assignment rows. (Named `course_enrollments` so it is not confused with the existing `enrollments`, which are student by semester and shown in the interface as "Term". See `schedule-and-catalog-ux.md`.)
+
+### Re-teaching (your answer to question 5)
+
+A re-teach is a **new assignment** with its own id and fresh work. `previous_assignment_id` points at the earlier one so the teacher view can suggest carry-over: the teacher's earlier notes, the questions she missed, her best score. These are suggestions only; they are never copied into the new assignment's history.
+
+## 6. Student work (history, append-only)
+
+**`assignment_progress`** (one row per assignment): `assignment_id, current_screen_id, started_at, last_active_at, completed_at, mastered_at, meta`. Done and mastered are separate columns.
+
+**`lesson_runs`:** `id, assignment_id, run_no, started_at, finished_at`. A **run** is one pass through the lesson from the first screen. Restarting the lesson creates a new run. Runs are what makes the attempt limit (section 7) work.
+
+**`quiz_attempts`:** `id, run_id, attempt_no, started_at, finished_at, score, max_score`.
+
+**`responses`:** `id, run_id, attempt_id (null for inline checks), question_id, answer jsonb, is_correct, answered_at`. Append-only.
+
+**`screen_views`:** `id, run_id, screen_id, entered_at, left_at, active_ms, gate_met`. Shows how long each screen was actually open, which is how the teacher sees skimming.
+
+**`session_notes`:** `id, assignment_id, kind (teacher | student), body jsonb, created_at`. The after-session notes and anything the student typed.
+
+**Derived, not stored:** current score is the best finished attempt across all runs. The official gradebook row (`grades`) is upserted from the best attempt, so existing grade views keep working. `completed_at` writes the usual `done` completion row. `mastered_at` is set the first time a best score reaches the threshold.
+
+## 7. Quiz attempt limit
+
+**Rule:** a run allows a small number of quiz attempts (default 2, immediately available). After that, the student must **start the lesson over** and click through to the quiz again, which creates a new run.
+
+- Enforced on the **server** at the moment an attempt starts, not just by hiding the button, so it cannot be spammed.
+- Settings (section 11): attempts per run, and an optional cap per day.
+- The best attempt across all runs is still the current score; nothing is lost.
+- The teacher can grant an extra attempt. The override is recorded.
+
+## 8. Screen gates and read-aloud
+
+**Gates** make sure a screen is actually read, not just clicked through. Each screen can set a gate; Next stays off until it is met:
+
+- **Minimum time.** Default computed from the word count (a placeholder to tune in the trial month, roughly the screen's words divided by 6, clamped to between 3 and 30 seconds), overridable per screen. Shown as a gentle progress ring ("take a moment to read"), not a punishment.
+- **Interaction.** Reveal all cards, answer the check, or play the video.
+- **Read-aloud finished** (below).
+- A per-student setting scales or turns off the minimum time. Some learners need more time and some will be slowed by a timer; the evidence on this for specific conditions is thin, so it is adjustable and never penalized.
+- Every screen visit is recorded in `screen_views`, so a lesson clicked through in a few seconds shows up in the teacher view.
+
+Honest limit: gates add friction and visibility, not security. Someone present at the table is still the real check.
+
+**Read-aloud.**
+
+- **First version:** the browser's built-in speech synthesis. No cost, no data leaves the device, voices vary by device. The screen's text (or a separate `readAloudText` where the written text should not be read word for word) is read when the student presses Play; when the speech ends, the gate is met and Next unlocks.
+- **Quirks to test on the devices you actually use:** playback must be started by a click or tap; long text can cut off in some browsers, so we read one sentence or paragraph at a time; the end event is not reliable everywhere, so there is always a teacher skip.
+- **Later:** pre-generated audio files stored as assets and attached to a screen (`audio`), for better and consistent voices.
+- A setting says whether read-aloud is required, optional, or off, per student.
+
+## 9. Themes
+
+A **theme** is a named set of design tokens. Assign one to a course, section or lesson; the most specific wins (lesson, then section, then course, then household default, then the app default).
+
+- **Storage:** `themes` (`id, household_id (null for built-in), slug, name, tokens jsonb, archived_at`) and a nullable `theme_id` on courses, sections and lessons.
+- **Tokens only, never free CSS.** A fixed list of keys: colors (background, surface, ink, muted, accent, good, bad), a font from an allowed list, corner radius, spacing scale, a background image (an asset), motion level. This keeps every theme consistent and safe.
+- **Each theme defines a light and a dark set.** On save, the validator checks contrast (4.5 to 1 for text, 3 to 1 for controls) so a theme cannot make a lesson unreadable.
+- **How it is applied:** the lesson player sets the theme's values as CSS custom properties on its root element; every component reads only those variables and never hard-codes colors. The mockup already works this way, so it is cheap if the rebuild's design tokens (R1) are done this way from the start.
+- Themes are presentation, not content, so they are **not** pinned to a lesson version. Restyling a theme restyles every lesson that uses it, which is the point.
+- Respects reduced-motion settings.
+
+## 10. Lesson content format
+
+As v1 (JSON, `schemaVersion: 1`, stable ids on every screen and question, a fixed list of screen types each with one React component, teacher notes and answer keys inside and stripped by the API for non-teacher requests, images and audio by asset id, video by URL). Additions:
+
+- Per screen: `gate: { minSeconds, interaction, readAloud }`, `readAloudText` (optional), `audio` (optional asset).
+- Mastery threshold is not in the content any more: it comes from settings (section 11).
+- Screen types still to add: `video`, `reading` (countdown timer, R3), `compare`, `map`.
+
+## 11. Settings store keys (default, and per-student override)
+
+| Key | Default |
 |---|---|
-| `assignment_id` (uuid, unique) | a stable identity for this assignment. See the open question below |
-| `content` (jsonb) | the student's own copy of the instruction, filled from the catalog when assigned |
-| `content_version` (int) | the catalog version it was copied from |
-| `previous_assignment_id` (uuid, nullable) | set when this is a re-teach of a lesson taught before; points at the earlier assignment so its notes can be carried over |
+| `quiz.mastery_threshold` | 0.8 |
+| `quiz.attempts_per_run` | 2 |
+| `quiz.attempts_per_day` | none |
+| `gate.min_time_scale` | 1.0 (0 = off) |
+| `gate.read_aloud` | optional |
+| `tts.voice`, `tts.rate` | device default |
+| `theme.default` | built-in |
 
-Why `content` is its own column and not inside `snapshot`: the schedule screen reads `snapshot` for every row; a 10 to 50 KB document in each would make every day view heavy. `snapshot` stays small text; `content` is loaded only when a lesson is opened.
+The settings store itself arrives in R1. Until then these are constants in one file.
 
-Behavior:
+## 12. Migrations: one concern each
 
-- Fill `content` in the same trigger that fills `snapshot` today.
-- **Customizing** (for example editing one screen for this student) changes `content` and adds `'content'` to `customized_fields`. In v1 customizing is all-or-nothing for the content: once customized, a catalog refresh will not touch it. Per-screen tracking can come later if we need it.
-- `refresh_lesson_snapshots()` keeps its rule: only future, unfinished, uncustomized assignments are refreshed. Started work is never rewritten. A lesson with any attempts is treated as started.
-- Size is not a concern: a 20 KB lesson times 200 lessons times 2 students is about 8 MB.
+Split the old "migration 003" into three smaller ones, each backed up first and each with a written rollback.
 
-Alternative considered: keep content in an immutable `lesson_versions` table and let assignments point at a version (no duplicates, perfect "what did she see" history). Not chosen because per-student edits need copy-on-write anyway, and copy-on-assign is the model we already built and the one you described. Easy to revisit if it ever gets heavy.
+1. **003: assignment identity.** Riskiest, because it changes keys on live tables the current portal uses. Add `id` to the schedule tables and backfill; add `assignment_id` to `completions` and `grades` and backfill by matching (student, date, lesson); then switch primary keys. **Before writing it:** query the live data for ambiguity (the same lesson scheduled twice on one day) and read the API and `syncClient.js` so the old portal keeps working throughout. The API keeps accepting the old shape and maps it to ids on the server, so the current portal is untouched. Own SPEC. Not needed for the playbook trial.
+2. **004: catalog structure.** Courses, sections, lesson columns, `lesson_versions`, `catalog_history`, themes, assets, `course_enrollments`. Additive only.
+3. **005: work tables.** `assignment_progress`, `lesson_runs`, `quiz_attempts`, `responses`, `screen_views`, `session_notes`. Additive only.
 
-## 6. Student work (new tables, history)
+004 and 005 add only new tables and columns, so rollback is simply not using them. 003 needs a tested rollback script.
 
-**assignment_progress**: one row per assignment
+## 13. Phasing
 
-| Column | Meaning |
+| In the first player (R2) | Later |
 |---|---|
-| `assignment_id` | which assignment |
-| `current_screen_id` | where she is, so resuming opens the same screen |
-| `started_at`, `last_active_at` | |
-| `completed_at` | set when she finishes the screens (this drives "done") |
-| `mastered_at` | set when a quiz attempt reaches the threshold (null = not yet) |
-| `meta` | anything not planned |
+| Courses, sections, lessons, immutable lesson versions | Course releases (named freezes) |
+| Assignment id, pin to version, re-teach link | In-app theme editor |
+| Screens, check gating, quiz, runs and attempt limit, resume | Generated audio files |
+| Minimum-time gate and the screen-view record | Teacher carry-over panel polish |
+| Themes: tokens, light and dark, two or three built in | Per-screen customizing UI |
+| Read-aloud with the browser voice | Section-wide quiz or exam |
 
-Done and mastered are separate columns on purpose.
+## 14. Decisions so far (Joshua)
 
-**quiz_attempts**: one row per try at the end quiz
+- Rescheduling only changes the date. Courses can be assigned whole or lesson by lesson. Re-teaching is a new assignment with fresh work and optional carry-over. Mastery threshold 80%, a setting in the settings store. Teacher-only data hidden by role only until per-person logins (a known limit that must be fixed before any other household uses this). Files hosted on the homelab server.
+- Hierarchy: course, section, lesson, as in section 1.
+- Wants version history kept in the database, with themes, an attempt limit, screen gates and read-aloud.
 
-`id, assignment_id, attempt_no, started_at, finished_at, score, max_score`
+## 15. Open questions
 
-**responses**: one row per answer, for quiz and inline check questions
-
-`id, assignment_id, attempt_id (null for inline checks), question_id, answer (jsonb), is_correct, answered_at`
-
-Append-only. Nothing is overwritten, so every answer and its date is kept.
-
-**session_notes**: the teacher's after-session notes and anything the student typed (such as the recall answer)
-
-`id, assignment_id, kind (teacher | student), body (jsonb), created_at`
-
-The teacher fields match the trial-month questions (attention 1 to 5, block that dragged, minutes used, quiz versus warm-up gap, screens to fix, what to change, topics to revisit). Stored as jsonb so the questions can change; compiled across lessons later.
-
-**Derived, not stored:** current score = the best finished attempt (a query or view). Mastery threshold comes from the content (`mastery.threshold`, default to be decided).
-
-## 7. How this meets the existing tables
-
-- `completions` stays. When `completed_at` is set, the API writes the usual `done` row, so the current dashboards and reports keep working. Marking done by hand still works for lessons with no instruction (plain lessons, or reading until R3).
-- `grades` stays as the **official gradebook row**. When an attempt finishes, the API upserts the grade from the best attempt (`grade_type = 'score'`, `score`, `max_score`). The full history is in `quiz_attempts`; `grades` is the one-line answer. Current PK is (student, date, lesson), so grades stay tied to the scheduled day; the attempt tables are the detailed truth.
-- Migration 001 history rules still hold: assignments reference lessons with `ON DELETE RESTRICT`, so a used lesson is archived, never deleted. New work tables reference `assignment_id`, and deleting an assignment that has work is refused. Rescheduling must change the date, not delete and recreate (see open question).
-
-## 8. Authoring paths, one pipeline
-
-1. **Hand-written or AI-drafted file** (JSON, or a simpler outline format we convert) goes through an import that runs the validator, then saves as a **draft** lesson.
-2. **In-app editor** edits the same JSON through forms and saves through the same validator. First version of the editor can be a plain JSON view with a live preview; the friendly screen-by-screen editor comes after.
-3. A draft is previewed in the player (student view and teacher view), then **published**. Only published lessons can be scheduled.
-4. Editing a published lesson bumps `instruction_version`. Assignments already copied are not changed unless you run the opt-in refresh.
-
-## 9. Decisions and open items
-
-**Decided (Joshua, 2026-10-20)**
-
-1. **Rescheduling only changes the date.** Moving an assignment to another day is an update to its date. Nothing is deleted or re-created, and the progress, attempts, responses and notes stay attached through `assignment_id`. Implementation check for R2: the current change-only sync in `src/lib/syncClient.js` and the API must be read to confirm a move is an update and not a delete plus insert. If it is, change it so `assignment_id` survives.
-2. **Courses can be assigned two ways:** the whole course in order (generating a day-by-day schedule) or lesson by lesson. Both end in the same copy-on-assign path.
-3. **Re-teaching is allowed and is a new assignment with fresh work.** It starts with no answers and no attempts. It can pull over useful context from the earlier assignment through `previous_assignment_id`: the teacher's notes, the questions she missed (to open the session with), and the best score as a reference. Carry-over is shown to the teacher as suggestions and is never copied into the new assignment's history.
-4. **Teacher notes and answer keys travel in the lesson content and are hidden only by role** (the API strips them from non-teacher requests) until per-person logins exist. Accepted for a single family. See "Known limit" below.
-
-**Known limit: teacher-only data is not secret.** Because there are no per-person logins (known deviation: PIN soft locks), a student can read teacher notes and answer keys by looking at the browser's network traffic. Fine for one household. **Must be resolved before any other household uses this:** per-person logins first, then enforce on the server that student sessions never receive teacher fields (and quiz answers are checked on the server, not in the browser). Tracked in ROADMAP Issues and in CLAUDE.md known deviations.
-
-**Still open**
-
-1. Mastery threshold default. The mockup uses 4 of 5 (80%). Per lesson, or one household setting?
-2. Asset storage. Files on the homelab served by Nginx, with source and license noted in the `assets` row. Backups must include them.
-3. How the carry-over suggestions look to the teacher (a panel in the teacher view before the lesson starts?). Design in R2.
-
-## 10. Migration 003 outline (not written)
-
-Add courses, new lessons columns, new schedule columns and the fill trigger update, `assignment_progress`, `quiz_attempts`, `responses`, `session_notes`, `assets`. Back up first (`db/backup.sh`); additive only (no drops, no rewrites of existing columns), so it can be rolled back by simply not using the new columns. Backfill `assignment_id` for existing rows. Per project rules: numbered, immutable, written through the SPEC route, applied when the API container restarts.
+1. ~~What does an assignment point at?~~ **Resolved 2026-10-21:** only a lesson is scheduled onto a day. Today's catalog lessons map to new lessons; sections are new.
+2. How do the existing Khan lessons and imported sheets map into courses and sections? Proposal: one course per subject-level set, one section per unit, the existing rows as lessons with empty content.
+3. Does a section have its own content, such as an intro or a section exam? Not in v1; the model allows adding a lesson of type "section quiz".
+4. Subject and course: a course belongs to one subject. Is that right?
+5. Asset hosting on the homelab: file layout, backup coverage, and license notes per image.
