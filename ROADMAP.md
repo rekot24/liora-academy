@@ -7,7 +7,7 @@ Plan changes happen in chat first, then land here. Last updated: 2026-10-26.
 
 **The January minimum (the forcing function).** If everything else slips, January still works with M1 + M2 and the curriculum track below, running on the current portal. The rebuild track (R0 to R5) is built in parallel and never blocks the start; nothing is switched over until its feature checklist is fully ticked.
 
-**Vision (2026-10-18).** A full-featured learning portal that handles all aspects of homeschool learning, not just scheduling. Under each lesson sits an *instruction* (working name): a series of single screens clicked through like slides, with explanations, images, diagrams and video embeds, short questions between chunks, and a quiz at the end. Quiz scores are automated and tracked, reading assignments use a countdown timer, and the student dashboard replaces today's done/not-done buttons. The interface is rebuilt as a professional, modular app (see the Rebuild track).
+**Vision (2026-10-18).** A full-featured learning portal that handles all aspects of homeschool learning, not just scheduling. Each lesson is a series of single screens clicked through like slides, with explanations, images, diagrams and video embeds, short questions between chunks, and a quiz at the end. Quiz scores are automated and tracked, reading assignments use a countdown timer, and the student dashboard replaces today's done/not-done buttons. The interface is rebuilt as a professional, modular app (see the Rebuild track).
 
 ---
 
@@ -28,7 +28,7 @@ Plan changes happen in chat first, then land here. Last updated: 2026-10-26.
 
 ## Now
 
-C1 (session playbook and the first draft of the instruction format) is in progress in chat; research notes are in `docs/research/learning-science.md`. On the code side M2 is next; its SPEC is written in chat first.
+C1 (session playbook and the first draft of the lesson format) is in progress in chat; research notes are in `docs/research/learning-science.md`. On the code side M2 is next; its SPEC is written in chat first.
 
 ## Next (in order)
 
@@ -47,14 +47,14 @@ Built on its own branch while the current portal keeps running. Nothing is switc
 **Decisions so far (2026-10-18)**
 - Stack: Vite + TypeScript, not Next.js. The portal is a private app behind Cloudflare Access, so server rendering gains nothing, and Next.js would need a Node server on the homelab. Structure follows the befish.cc rebuild: one folder per component, hooks for logic, `lib/` for constants and pure logic, CSS Modules with design tokens, shared Drawer, Modal, Toast and ErrorBoundary.
 - Build in parallel, then switch (not a rewrite in place): January must keep working, and a checklist guards against the feature-loss pattern.
-- An instruction is an ordered list of screens: explain, image or diagram, video embed, quick check, reflection, final quiz. Limited scrolling: one screen per chunk where it fits; split a screen rather than scroll when practical. Videos are embeds (YouTube and similar). Images are stored on the server, not in the public repo.
+- A lesson's content is an ordered list of screens: explain, image or diagram, video embed, quick check, reflection, final quiz. Limited scrolling: one screen per chunk where it fits; split a screen rather than scroll when practical. Videos are embeds (YouTube and similar). Images are stored on the server, not in the public repo.
 - One shared lesson format, three ways to fill it: AI-drafted then reviewed, hand-written files, and an in-app editor. The format comes first and the editor last.
-- The instruction is copied onto the student's assignment when scheduled, like the lesson text today, so editing one student's copy never changes the catalog or another student.
+- No copy-on-assign (changed 2026-10-26; the earlier "copy the lesson content onto the assignment" decision is replaced). The catalog is versioned and each assignment points at one exact version. Details under R2.
 - Quizzes: multiple choice, scored automatically, the answer revealed after submitting (Khan Academy style). Retakes are allowed. Every attempt is kept with its date and per-question answers; the best attempt is the current score. Show right and wrong counts, a score (for example "8 of 10, 80%") and a plain mastery level. Confirm with CHEC whether letter grades are needed for records.
 - Done and mastered are separate. Done means the work was completed (last screen reached, or reading countdown finished) and is never taken away. Mastery comes from the best quiz attempt against a threshold set in settings: not attempted, not yet, mastered. A "not yet" prompts a retake and feeds spaced review.
 - Reading assignments use a fixed countdown (default from the lesson's estimated minutes, editable per assignment) with a buzzer and an on-screen alert, not an open timer. The timer stores its end time so it stays accurate if the tab sleeps. Finishing the countdown marks the reading done.
-- Resume: leaving mid-instruction returns the student to the same screen.
-- A real settings store (household timezone, per-student options, mastery threshold, feature flags) replaces hardcoded values. Instruction screens ship behind a feature flag.
+- Resume: leaving mid-lesson returns the student to the same screen.
+- A real settings store (household timezone, per-student options, mastery threshold, feature flags) replaces hardcoded values. Lesson screens ship behind a feature flag.
 - GUI: role-based dashboards (student and parent) with secondary controls in a slide-in drawer, replacing the layered buttons in today's admin panel. Layouts are designed in R1; the reference is the befish.cc Fish Tracker and Fish Dex pages.
 
 **R0: Feature checklist (target: Sun Nov 15)**
@@ -62,12 +62,13 @@ List every feature of the current UI, screen by screen, and decide where the new
 Done when: the checklist is committed and Joshua agrees it is complete.
 
 **R1: Shell, tokens and dashboards (target: Sun Dec 13)**
-Vite + TypeScript app, design tokens, shared components, settings store, student and parent dashboards, and catalog and schedule screens that read the real data through the existing API. Includes grade tags and catalog filters (the old M3).
+Vite + TypeScript app, design tokens, shared components, settings store, student and parent dashboards, and catalog and schedule screens that read the real data through the existing API. Includes grade tags and catalog filters (the old M3). Requirements become a per-household setting (required days, hours, subjects) instead of Colorado wording in the interface; see `docs/design/schedule-and-catalog-ux.md` section 10.
+R1 design reference: `docs/design/schedule-and-catalog-ux.md`; the R1 SPEC reads it. A clickable schedule-builder mockup is needed before the R1 SPEC is written.
 Done when: the new app shows Liora's and Amari's real data next to the old portal.
 
-**R2: Instruction player and quizzes (target: Sun Jan 17)**
-Start with the storage design in `docs/design/lesson-structure.md` (draft v1: courses, instruction content copied onto assignments, progress, attempts and responses as history, a stable assignment id, re-teach as a new assignment). Then migration 003, API endpoints, the player, and automatic quiz scoring tied to the existing grades.
-Done when: one real instruction runs end to end for both students and its score shows on the dashboard.
+**R2: Lesson player and quizzes (target: Sun Jan 17)**
+Start with the storage design in `docs/design/lesson-structure.md`. In short: a versioned catalog, and one assignment record per student per lesson that holds the version taken, progress, answers, notes and grades. No copy-on-assign. The document has the tables, the migration order, the rules and the open questions; do not repeat them here. Then the migrations, API endpoints, the player, and automatic quiz scoring tied to the existing grades.
+Done when: one real lesson runs end to end for both students and its score shows on the dashboard.
 
 **R3: Reading countdown timer (target: Sun Jan 31)**
 Countdown, buzzer, time log, reading marked done automatically.
@@ -75,7 +76,7 @@ Done when: a reading assignment completes itself when the countdown ends.
 
 **R4: Authoring (target: Sun Feb 14 for import; the editor after)**
 Import format first (AI-drafted and hand-written files), then the in-app editor.
-Done when: a drafted instruction imports and plays without editing the database by hand.
+Done when: a drafted lesson imports and plays without editing the database by hand.
 
 **R5: Cutover (target: Mar 2027)**
 Switch only when R0's checklist is fully ticked. Rollback written down first; run `bash db/backup.sh` first.
@@ -85,11 +86,11 @@ Done when: the old front end is retired and every checklist item is ticked.
 
 These matter more to the goal than any milestone above. They need dates because nothing else forces them.
 
-- [ ] C1 Session playbook: the lecture-then-AI-questions format, class blocks of 15 to 35 minutes, Wed to Fri, how the AI is used with the girls (target: Oct 31). Also produces the first draft of the instruction format (screen types, quiz rules) that R2 builds. Research: `docs/research/learning-science.md`. Progress 2026-10-20: session model v0 (five blocks, about 30 minutes, plus or minus 15) and a clickable mockup (`docs/mockups/instruction-mockup.html`) are drafted and reviewed once. Still to do: write the playbook itself and try it on one real lesson.
-- [ ] C2 One shared grade 6 to 8 arc: subject list and a Colorado requirements checklist, confirmed with CHEC (target: Nov 15)
+- [ ] C1 Session playbook: the lecture-then-AI-questions format, class blocks of 15 to 35 minutes, how the AI is used with the girls (target: Oct 31). Decisions 2026-10-26: the first playbook subjects are Constitution, science and Bible; the playbook may need a separate form per subject; the weekly rhythm is full-time teacher mode with no handyman days (this replaces "Wed to Fri"). Lesson 1 is written by hand in the v1 format (`docs/design/lesson-structure.md`) before any player is built. Also produces the first draft of the lesson format (screen types, quiz rules) that R2 builds. Research: `docs/research/learning-science.md`. Progress 2026-10-20: session model v0 (five blocks, about 30 minutes, plus or minus 15) and a clickable mockup (`docs/mockups/instruction-mockup.html`) are drafted and reviewed once. Still to do: write the playbook itself and try it on one real lesson.
+- [ ] C2 One shared grade 6 to 8 arc: subject list and a Colorado requirements checklist, confirmed with CHEC (target: Nov 15). Assumes Colorado and CHEC. If the Tennessee move is confirmed, re-check the requirements by web search, never from memory. The requirements go into the app as a per-household setting (required days, hours, subjects), not Colorado wording; see `docs/design/schedule-and-catalog-ux.md` section 10.
 - [ ] C3 Spring 2027: the first four weeks of lessons only, not the whole semester (target: Dec 15)
 - [ ] C4 Field-trip and real-world experience list, weighted over classroom time (target: Dec 15)
-- [ ] C5 Amari's enrollment paperwork and any notice of intent, with timing confirmed with CHEC (target: early Dec; confirm the deadline now)
+- [ ] C5 Amari's enrollment paperwork and any notice of intent, with timing confirmed with CHEC (target: early Dec; confirm the deadline now). Assumes Colorado and CHEC. If the Tennessee move is confirmed, re-check the requirements and deadlines by web search, never from memory.
 - [ ] C6 Decide the math pacing question (slow to 1x/week, extend to Unit 6, or finish early at 3x/week)
 
 ## Later (ideas with a rough order, not committed)
@@ -99,6 +100,7 @@ These matter more to the goal than any milestone above. They need dates because 
 - How AI lives in the portal: either Joshua keeps running sessions in Claude and the lesson page holds the prepared lecture and question prompts, or a chat panel inside the portal. Decide after one semester of real sessions.
 - Per-person logins (the caller lookup is isolated in `api/src/auth.mjs`)
 - Spaced review: missed quiz questions resurface in later sessions (uses the attempt history from R2)
+- The library: an open, searchable catalog. "Taken" is a badge read from the assignment record. A lesson can be reviewed without retaking it, and retaking a whole course is also possible. Built on the version model in `docs/design/lesson-structure.md`; nothing is built before R2.
 
 ## Not now
 
@@ -107,6 +109,7 @@ These matter more to the goal than any milestone above. They need dates because 
 - Selling or multi-household onboarding (the data model already allows it; no UI)
 - Push notifications beyond the current alert settings
 - befish.cc rebuild (separate project)
+- Time slots on assignments and the teacher-overlap check (assignments are for a day, not a time)
 
 ## Issues to be addressed
 
@@ -119,16 +122,18 @@ Found in the 2026-10-04 review. Move into a milestone when they block something.
 - [ ] Root clutter: the untouched Vite template README
 - [x] 2026-10-18 The laptop clone at D:\coding\liora-academy is synced to `main`. Old draft copies of ROADMAP, SPEC and CLAUDE are in D:\coding\liora-academy-backup and can be deleted.
 - [x] 2026-10-25 (fixed in M1.1) **"Today" is computed in UTC, not local time.** `today()` in `src/App.jsx` (and several other `toISOString().split("T")[0]` date keys) use the UTC date, so after about 6 PM Mountain (5 PM in winter) the portal shows tomorrow's lessons. The server timezone does not affect this; it runs in the browser. Fix: one shared local-date helper used everywhere. Small single-file change; do it right after M1, on its own branch. The rebuild's household timezone setting is the long-term fix, but January teaching runs on the current portal, so the small fix is still worth doing.
-- [ ] **Teacher-only data is not secret.** Teacher notes and quiz answer keys will travel in the lesson content and are hidden only by role, so a student could read them in browser dev tools. Fine for one family. Before any other household uses the portal: per-person logins, then the server must never send teacher fields or answer keys to student sessions. Details: `docs/design/lesson-structure.md`, section 9.
+- [ ] **Teacher-only data is not secret.** Teacher notes and quiz answer keys will travel in the lesson content and are hidden only by role, so a student could read them in browser dev tools. Fine for one family. Before any other household uses the portal: per-person logins, then the server must never send teacher fields or answer keys to student sessions. Also review children's privacy law (COPPA) and content rights first; see `docs/design/schedule-and-catalog-ux.md` section 11. Details: `docs/design/lesson-structure.md`, section 9.
 - [ ] Low priority: `db/lib/legacy.mjs` (about line 172) falls back to `exportedAt.slice(0, 10)`, the UTC date, when a legacy snapshot has no date. It only affects the one-off legacy import, not "today". Leave unless the legacy import is run again.
+- [ ] Low priority: the student date line shows the weekday twice ("Wednesday - Wednesday, October 21"). Candidate for the small-change route.
 - [ ] Login screen shows the default PIN hint (`App.jsx`, "Default PIN: 9999"). Low risk (soft lock), will be gone with the rebuild (R1).
 - [ ] After a deploy, a browser can keep serving the cached old front end until a hard refresh (found during M1 verification). Likely fix: a short no-cache header for `index.html` in Nginx (hashed assets can stay cached). Do not change Nginx without its own SPEC.
-- [ ] Monthly review of project instructions and dev-standards (next: Nov 4)
+- [ ] Monthly review of project instructions and dev-standards (next: 2026-11-25)
 
 ## Log
 
 Newest first. One line per finished milestone: date, what shipped, decisions worth keeping.
 
+- 2026-10-26 Planning (decisions from 2026-10-25 and 2026-10-26), no milestone shipped. C1: first playbook subjects are Constitution, science and Bible; the playbook may need a form per subject; the weekly rhythm is full-time teacher mode, no handyman days; lesson 1 is hand-written in the v1 format before any player is built. Storage: versioned catalog, one assignment record per student per lesson, no copy-on-assign (replaces the 2026-10-18 copy decision; `docs/design/lesson-structure.md`). Added the library to Later. C2 and C5 assume Colorado and CHEC; if the Tennessee move is confirmed, re-check requirements by web search, not memory. Monthly review moved to 2026-11-25.
 - 2026-10-25 M1.1 Local-date fix shipped (PR #5) and verified after deploy: school-day keys now come from the browser's local date, so the portal shows today's lessons in the evening. One helper, `src/lib/dates.js` (`localDateKey`, `dateFromKey`), used at all seven sites in `App.jsx`, including two that only worked because of Denver's UTC offset. Key format unchanged, so no data migration. Real timestamps stay UTC. Evening completions recorded before the fix sit under the next day's key and are not repaired (needs its own SPEC and a backup first).
 
 - 2026-10-20 Planning, no milestone shipped. Lesson storage design drafted (`docs/design/lesson-structure.md`). Decisions: rescheduling only changes a date; courses can be assigned whole or lesson by lesson; re-teaching is a new assignment with fresh work and optional carry-over of notes; teacher-only data hidden by role only until per-person logins (recorded as an issue).
