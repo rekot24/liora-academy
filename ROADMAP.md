@@ -1,7 +1,7 @@
 # ROADMAP
 
 The path for Liora's Academy. **SPEC.md** is the specifics of the current milestone, **CLAUDE.md** is how to work and where things are.
-Plan changes happen in chat first, then land here. Last updated: 2026-10-20.
+Plan changes happen in chat first, then land here. Last updated: 2026-10-26.
 
 **Goal:** an interactive, AI-assisted classical education plus everyday skills a traditional school skips, for Liora (grade 7) and Amari (grade 8, joins in January 2027). Colorado requirements are the floor, not the goal.
 
@@ -118,8 +118,9 @@ Found in the 2026-10-04 review. Move into a milestone when they block something.
 - [ ] `AUTO_MIGRATE=true` applies new migrations the moment the API container restarts, ahead of any backup. Consider `false` plus a manual `npm run migrate` after `db/backup.sh`.
 - [ ] Root clutter: the untouched Vite template README
 - [x] 2026-10-18 The laptop clone at D:\coding\liora-academy is synced to `main`. Old draft copies of ROADMAP, SPEC and CLAUDE are in D:\coding\liora-academy-backup and can be deleted.
-- [ ] **"Today" is computed in UTC, not local time.** `today()` in `src/App.jsx` (and several other `toISOString().split("T")[0]` date keys) use the UTC date, so after about 6 PM Mountain (5 PM in winter) the portal shows tomorrow's lessons. The server timezone does not affect this; it runs in the browser. Fix: one shared local-date helper used everywhere. Small single-file change; do it right after M1, on its own branch. The rebuild's household timezone setting is the long-term fix, but January teaching runs on the current portal, so the small fix is still worth doing.
+- [x] 2026-10-25 (fixed in M1.1) **"Today" is computed in UTC, not local time.** `today()` in `src/App.jsx` (and several other `toISOString().split("T")[0]` date keys) use the UTC date, so after about 6 PM Mountain (5 PM in winter) the portal shows tomorrow's lessons. The server timezone does not affect this; it runs in the browser. Fix: one shared local-date helper used everywhere. Small single-file change; do it right after M1, on its own branch. The rebuild's household timezone setting is the long-term fix, but January teaching runs on the current portal, so the small fix is still worth doing.
 - [ ] **Teacher-only data is not secret.** Teacher notes and quiz answer keys will travel in the lesson content and are hidden only by role, so a student could read them in browser dev tools. Fine for one family. Before any other household uses the portal: per-person logins, then the server must never send teacher fields or answer keys to student sessions. Details: `docs/design/lesson-structure.md`, section 9.
+- [ ] Low priority: `db/lib/legacy.mjs` (about line 172) falls back to `exportedAt.slice(0, 10)`, the UTC date, when a legacy snapshot has no date. It only affects the one-off legacy import, not "today". Leave unless the legacy import is run again.
 - [ ] Login screen shows the default PIN hint (`App.jsx`, "Default PIN: 9999"). Low risk (soft lock), will be gone with the rebuild (R1).
 - [ ] After a deploy, a browser can keep serving the cached old front end until a hard refresh (found during M1 verification). Likely fix: a short no-cache header for `index.html` in Nginx (hashed assets can stay cached). Do not change Nginx without its own SPEC.
 - [ ] Monthly review of project instructions and dev-standards (next: Nov 4)
@@ -127,6 +128,8 @@ Found in the 2026-10-04 review. Move into a milestone when they block something.
 ## Log
 
 Newest first. One line per finished milestone: date, what shipped, decisions worth keeping.
+
+- 2026-10-25 M1.1 Local-date fix shipped (PR #5) and verified after deploy: school-day keys now come from the browser's local date, so the portal shows today's lessons in the evening. One helper, `src/lib/dates.js` (`localDateKey`, `dateFromKey`), used at all seven sites in `App.jsx`, including two that only worked because of Denver's UTC offset. Key format unchanged, so no data migration. Real timestamps stay UTC. Evening completions recorded before the fix sit under the next day's key and are not repaired (needs its own SPEC and a backup first).
 
 - 2026-10-20 Planning, no milestone shipped. Lesson storage design drafted (`docs/design/lesson-structure.md`). Decisions: rescheduling only changes a date; courses can be assigned whole or lesson by lesson; re-teaching is a new assignment with fresh work and optional carry-over of notes; teacher-only data hidden by role only until per-person logins (recorded as an issue).
 - 2026-10-18 Planning, no milestone shipped. Scope set: a full learning portal with an instruction layer (screens, quizzes, mastery, reading countdown), rebuilt in Vite + TypeScript in parallel with the current portal. The Rebuild track (R0 to R5) replaces M4 and M5; the decisions are listed under it. Research notes started in `docs/research/learning-science.md`.
